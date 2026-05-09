@@ -19,7 +19,7 @@ sudo apt update && sudo apt upgrade -y
 step "Installing base tools"
 sudo apt install -y \
   git curl wget build-essential unzip ca-certificates gnupg lsb-release \
-  stow xclip xsel fontconfig fzf tmux ripgrep bat eza
+  stow xclip xsel wl-clipboard fontconfig fzf tmux ripgrep bat eza apt-transport-https
 
 # bat may be called batcat on Ubuntu
 if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
@@ -50,7 +50,7 @@ ok "Brave installed"
 
 # ── Brave extensions (via managed policy) ────────────────────
 step "Brave extensions"
-BRAVE_POLICY_DIR="/etc/opt/chrome/policies/managed"
+BRAVE_POLICY_DIR="/etc/brave/policies/managed"
 sudo mkdir -p "$BRAVE_POLICY_DIR"
 
 sudo tee "$BRAVE_POLICY_DIR/extensions.json" > /dev/null << 'EOF'
@@ -94,8 +94,12 @@ ok "Docker installed (logout required to use without sudo)"
 
 # ── Visual Studio Code ────────────────────────────────────────
 step "Visual Studio Code"
-sudo snap install code --classic
-sleep 3
+curl -fsS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | \
+  sudo tee /usr/share/keyrings/packages.microsoft.gpg > /dev/null
+echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/packages.microsoft.gpg] \
+https://packages.microsoft.com/repos/code stable main" | \
+  sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+sudo apt update && sudo apt install -y code
 
 VSCODE_EXTENSIONS=(
   "zhuangtongfa.material-theme"
@@ -228,7 +232,7 @@ ok "Obsidian installed"
 
 # ── nvm + Node LTS (latest stable) ───────────────────────────
 step "nvm + Node.js LTS"
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 nvm install --lts
@@ -253,22 +257,51 @@ ok "Python $LATEST_PYTHON installed via pyenv"
 step "SDKMAN + Java LTS"
 curl -s "https://get.sdkman.io" | bash
 source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
-sdk install java $(sdk list java | grep -E "tem.*21\." | head -1 | awk '{print $NF}') || \
-sdk install java 21.0.3-tem
-sdk default java 21.0.3-tem 2>/dev/null || true
-ok "Java LTS installed via SDKMAN"
+JAVA_VERSION=$(sdk list java 2>/dev/null | grep -oE '21\.[0-9]+\.[0-9]+-tem' | head -1)
+[ -z "$JAVA_VERSION" ] && JAVA_VERSION="21.0.3-tem"
+sdk install java "$JAVA_VERSION" || true
+sdk default java "$JAVA_VERSION" 2>/dev/null || true
+ok "Java $JAVA_VERSION installed via SDKMAN"
 
 # ── OpenCode ──────────────────────────────────────────────────
 step "OpenCode"
 curl -fsSL https://opencode.ai/install | bash && ok "OpenCode installed" || \
   warn "Install OpenCode manually: curl -fsSL https://opencode.ai/install | bash"
 
+# ── GitHub CLI ────────────────────────────────────────────────
+step "GitHub CLI"
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+  sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+https://cli.github.com/packages stable main" | \
+  sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install -y gh
+ok "GitHub CLI installed (run 'gh auth login' to authenticate)"
+
+# ── Timezone & locale ─────────────────────────────────────────
+step "Timezone (Europe/Madrid)"
+sudo timedatectl set-timezone Europe/Madrid 2>/dev/null || warn "Could not set timezone"
+ok "Timezone set"
+
+# ── Unattended security upgrades ──────────────────────────────
+step "Unattended security upgrades"
+sudo apt install -y unattended-upgrades
+sudo dpkg-reconfigure -f noninteractive unattended-upgrades
+ok "Automatic security upgrades enabled"
+
 # ── Git global config ─────────────────────────────────────────
 step "Git global configuration"
-echo -n "  Your name for Git (e.g. John Smith): "
-read -r GIT_NAME
-echo -n "  Your email for Git (e.g. john@email.com): "
-read -r GIT_EMAIL
+# Allow env var override for non-interactive (curl | bash) runs.
+# When piped, stdin is the script, so we read from /dev/tty.
+if [ -z "${GIT_NAME:-}" ]; then
+  echo -n "  Your name for Git (e.g. John Smith): "
+  read -r GIT_NAME </dev/tty || true
+fi
+if [ -z "${GIT_EMAIL:-}" ]; then
+  echo -n "  Your email for Git (e.g. john@email.com): "
+  read -r GIT_EMAIL </dev/tty || true
+fi
 
 git config --global user.name  "$GIT_NAME"
 git config --global user.email "$GIT_EMAIL"
@@ -478,7 +511,7 @@ alias cat="bat --style=auto"
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
-alias grep="rg"
+alias rgg="rg"
 
 # ── Aliases: dev ───────────────────────────────────────────
 alias nrd="npm run dev"
@@ -506,22 +539,30 @@ new-ssh() {
   eval "$(ssh-agent -s)"
   ssh-add "$keypath"
 
-  # Add entry to ~/.ssh/config
-  cat >> "$HOME/.ssh/config" << EOF
+  # Add entry to ~/.ssh/config (skip if already present)
+  if ! grep -q "^Host github-$label$" "$HOME/.ssh/config" 2>/dev/null; then
+    cat >> "$HOME/.ssh/config" << EOF
 
 Host github-$label
   HostName github.com
   User git
   IdentityFile $keypath
 EOF
+  fi
 
   echo ""
   echo "Public key (paste in GitHub / GitLab -> Settings -> SSH keys):"
   echo "──────────────────────────────────────────────────────────────"
   cat "${keypath}.pub"
   echo "──────────────────────────────────────────────────────────────"
-  cat "${keypath}.pub" | xclip -selection clipboard 2>/dev/null || \
-  cat "${keypath}.pub" | xsel --clipboard --input 2>/dev/null || true
+  # Wayland first, then X11 fallbacks
+  if command -v wl-copy &>/dev/null && [ -n "$WAYLAND_DISPLAY" ]; then
+    wl-copy < "${keypath}.pub"
+  elif command -v xclip &>/dev/null; then
+    xclip -selection clipboard < "${keypath}.pub"
+  elif command -v xsel &>/dev/null; then
+    xsel --clipboard --input < "${keypath}.pub"
+  fi
   echo "[OK] Copied to clipboard"
   echo ""
   echo "Test the connection with: ssh -T git@github.com"
@@ -547,6 +588,13 @@ update-all() {
 
   echo "== Updating global npm packages =="
   npm update -g
+  command -v pnpm &>/dev/null && pnpm self-update 2>/dev/null || true
+
+  echo "== Updating OpenCode =="
+  command -v opencode &>/dev/null && (curl -fsSL https://opencode.ai/install | bash) || true
+
+  echo "== Cleaning up apt =="
+  sudo apt autoremove -y && sudo apt autoclean -y
 
   echo "[OK] Everything updated"
 }
@@ -561,6 +609,36 @@ mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
 touch "$HOME/.ssh/config"
 chmod 600 "$HOME/.ssh/config"
+
+# ── GNOME tweaks ──────────────────────────────────────────────
+step "GNOME tweaks"
+if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
+  # Dark mode
+  gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+  gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null || true
+  # Show seconds in the clock
+  gsettings set org.gnome.desktop.interface clock-show-seconds true 2>/dev/null || true
+  # Show weekday
+  gsettings set org.gnome.desktop.interface clock-show-weekday true 2>/dev/null || true
+  # Disable natural scroll on mouse (keep on touchpad)
+  gsettings set org.gnome.desktop.peripherals.mouse natural-scroll false 2>/dev/null || true
+
+  # Spanish keyboard layout
+  gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'es')]" 2>/dev/null || true
+
+  # GNOME Terminal: set FiraCode Nerd Font on the default profile
+  if command -v dconf &>/dev/null; then
+    PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null | tr -d "'")
+    if [ -n "$PROFILE" ]; then
+      PROFILE_PATH="/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
+      dconf write "${PROFILE_PATH}use-system-font" "false" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}font" "'FiraCode Nerd Font 12'" 2>/dev/null || true
+    fi
+  fi
+  ok "GNOME tweaks applied (dark mode, terminal font)"
+else
+  warn "GNOME not detected — skipping GNOME tweaks"
+fi
 
 # ── Done ──────────────────────────────────────────────────────
 echo -e "\n${GREEN}============================================${NC}"
