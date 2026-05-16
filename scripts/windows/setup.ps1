@@ -176,6 +176,29 @@ Get-CimInstance Win32_StartupCommand | ForEach-Object {
 }
 Ok "Common startup apps disabled"
 
+# ── Desktop wallpaper ─────────────────────────────────────────
+Step "Setting desktop wallpaper"
+$bgSrc = Join-Path $script_dir "..\..\assets\background.jpg"
+if (Test-Path $bgSrc) {
+    $picturesDir = [Environment]::GetFolderPath("MyPictures")
+    $wallpaperPath = Join-Path $picturesDir "background.jpg"
+    Copy-Item $bgSrc $wallpaperPath -Force
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -Value $wallpaperPath
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name WallpaperStyle -Value "10"
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name TileWallpaper -Value "0"
+    Add-Type @"
+using System.Runtime.InteropServices;
+public class Wallpaper {
+  [DllImport("user32.dll", CharSet=CharSet.Auto)]
+  public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+}
+"@
+    [Wallpaper]::SystemParametersInfo(20, 0, $wallpaperPath, 3) | Out-Null
+    Ok "Wallpaper set to $wallpaperPath"
+} else {
+    Warn "assets\background.jpg not found — skipping wallpaper"
+}
+
 # ── Enable Dark Mode  ─────────────────────────────────────────
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
   -Name "AppsUseLightTheme" -Value 0

@@ -700,7 +700,6 @@ install_gnome_extension() {
 }
 
 GNOME_EXTENSIONS=(
-  "blur-my-shell@aunetx"
   "space-bar@luchrioh"
 )
 for ext in "${GNOME_EXTENSIONS[@]}"; do
@@ -723,6 +722,18 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
 
   # Spanish keyboard layout
   gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'es')]" 2>/dev/null || true
+
+  # Desktop background
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  BG_SRC="$REPO_ROOT/assets/background.jpg"
+  BG_DEST="$HOME/Pictures/background.jpg"
+  if [ -f "$BG_SRC" ]; then
+    mkdir -p "$HOME/Pictures"
+    cp "$BG_SRC" "$BG_DEST"
+    gsettings set org.gnome.desktop.background picture-uri "file://$BG_DEST" 2>/dev/null || true
+    gsettings set org.gnome.desktop.background picture-uri-dark "file://$BG_DEST" 2>/dev/null || true
+    gsettings set org.gnome.desktop.background picture-options 'zoom' 2>/dev/null || true
+  fi
 
   # Fixed 4 workspaces (disable dynamic) + Super+1..4 to switch
   gsettings set org.gnome.mutter dynamic-workspaces false 2>/dev/null || true
