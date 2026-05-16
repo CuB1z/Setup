@@ -220,6 +220,57 @@ step "Postman"
 sudo snap install postman
 ok "Postman installed"
 
+# ── Ulauncher ─────────────────────────────────────────────────
+step "Ulauncher"
+sudo add-apt-repository universe -y
+sudo add-apt-repository ppa:agornostal/ulauncher -y
+sudo apt update && sudo apt install -y ulauncher
+
+# Stop any running ulauncher with SIGKILL so it doesn't dump its in-memory
+# settings over the file we're about to write
+pkill -9 -f ulauncher 2>/dev/null || true
+sleep 1
+
+# Config: Super+Space hotkey + hide tray indicator
+ULAUNCHER_CONFIG_DIR="$HOME/.config/ulauncher"
+mkdir -p "$ULAUNCHER_CONFIG_DIR"
+cat > "$ULAUNCHER_CONFIG_DIR/settings.json" << 'EOF'
+{
+  "blacklisted-desktop-dirs": "/usr/share/locale:/usr/share/app-install:/usr/share/kservices5:/usr/share/fk5:/usr/share/kservicetypes5:/usr/share/applications/screensavers:/usr/share/kde4:/usr/share/mimelnk",
+  "clear-previous-query": true,
+  "disable-desktop-filters": false,
+  "grab-mouse-pointer": false,
+  "hotkey-show-app": "<Super>space",
+  "render-on-screen": "mouse-pointer-monitor",
+  "show-indicator-icon": false,
+  "show-recent-apps": "0",
+  "terminal-command": "",
+  "theme-name": "dark"
+}
+EOF
+
+# Autostart on login so the hotkey works after reboot
+mkdir -p "$HOME/.config/autostart"
+cat > "$HOME/.config/autostart/ulauncher.desktop" << 'EOF'
+[Desktop Entry]
+Name=Ulauncher
+Comment=Application launcher
+GenericName=Launcher
+Categories=GNOME;GTK;Utility;
+Exec=env GDK_BACKEND=x11 ulauncher --hide-window --no-window-shadow
+Icon=ulauncher
+Terminal=false
+Type=Application
+X-GNOME-Autostart-enabled=true
+EOF
+
+# Launch now so the hotkey is live in the current session
+if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+  setsid ulauncher --hide-window </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+fi
+ok "Ulauncher installed and configured (Super+Space, indicator hidden)"
+
 # ── Spotify ───────────────────────────────────────────────────
 step "Spotify"
 sudo snap install spotify
@@ -610,6 +661,53 @@ chmod 700 "$HOME/.ssh"
 touch "$HOME/.ssh/config"
 chmod 600 "$HOME/.ssh/config"
 
+# ── GNOME Shell Extension Manager ─────────────────────────────
+step "GNOME Shell Extension Manager"
+sudo apt install -y gnome-shell-extension-manager
+ok "gnome-shell-extension-manager installed"
+
+# ── GNOME Shell extensions ────────────────────────────────────
+step "GNOME Shell extensions"
+install_gnome_extension() {
+  local uuid="$1"
+  if ! command -v gnome-shell &>/dev/null || ! command -v gnome-extensions &>/dev/null; then
+    warn "GNOME Shell not available — skipping $uuid"
+    return 0
+  fi
+  local shell_version
+  shell_version=$(gnome-shell --version | grep -oE '[0-9]+' | head -1)
+  local info
+  info=$(curl -fsS "https://extensions.gnome.org/extension-info/?uuid=${uuid}&shell_version=${shell_version}" 2>/dev/null) || {
+    warn "Could not query extensions.gnome.org for $uuid"
+    return 0
+  }
+  local version_tag
+  version_tag=$(echo "$info" | grep -oE '"version_tag":[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | head -1)
+  if [ -z "$version_tag" ]; then
+    warn "No compatible version of $uuid for GNOME $shell_version"
+    return 0
+  fi
+  local tmp
+  tmp=$(mktemp -d)
+  if curl -fsSL "https://extensions.gnome.org/download-extension/${uuid}.shell-extension.zip?version_tag=${version_tag}" -o "$tmp/ext.zip"; then
+    gnome-extensions install -f "$tmp/ext.zip" 2>/dev/null || warn "Failed to install $uuid"
+    gnome-extensions enable "$uuid" 2>/dev/null || warn "Enable $uuid after restarting GNOME Shell"
+    ok "Installed $uuid"
+  else
+    warn "Could not download $uuid"
+  fi
+  rm -rf "$tmp"
+}
+
+GNOME_EXTENSIONS=(
+  "blur-my-shell@aunetx"
+  "space-bar@luchrioh"
+)
+for ext in "${GNOME_EXTENSIONS[@]}"; do
+  install_gnome_extension "$ext"
+done
+warn "Log out and back in (or restart GNOME Shell) to fully activate extensions"
+
 # ── GNOME tweaks ──────────────────────────────────────────────
 step "GNOME tweaks"
 if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
@@ -625,6 +723,24 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
 
   # Spanish keyboard layout
   gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'es')]" 2>/dev/null || true
+
+  # Fixed 4 workspaces (disable dynamic) + Super+1..4 to switch
+  gsettings set org.gnome.mutter dynamic-workspaces false 2>/dev/null || true
+  gsettings set org.gnome.desktop.wm.preferences num-workspaces 4 2>/dev/null || true
+  for i in 1 2 3 4; do
+    gsettings set org.gnome.desktop.wm.keybindings "switch-to-workspace-$i" "['<Super>$i']" 2>/dev/null || true
+    gsettings set org.gnome.shell.keybindings "switch-to-application-$i" "[]" 2>/dev/null || true
+  done
+  # Ubuntu Dock intercepts Super+N to launch dock apps — disable so workspace shortcuts win
+  gsettings set org.gnome.shell.extensions.dash-to-dock hot-keys false 2>/dev/null || true
+  gsettings set org.gnome.shell.extensions.dash-to-dock shortcut "[]" 2>/dev/null || true
+
+  # Window management shortcuts: Super+Q close, Super+F toggle maximize
+  gsettings set org.gnome.desktop.wm.keybindings close "['<Super>q']" 2>/dev/null || true
+  gsettings set org.gnome.desktop.wm.keybindings toggle-maximized "['<Super>f']" 2>/dev/null || true
+  # Free Super+Space (used by default to switch input sources) so Ulauncher can take it
+  gsettings set org.gnome.desktop.wm.keybindings switch-input-source "[]" 2>/dev/null || true
+  gsettings set org.gnome.desktop.wm.keybindings switch-input-source-backward "[]" 2>/dev/null || true
 
   # GNOME Terminal: set FiraCode Nerd Font on the default profile
   if command -v dconf &>/dev/null; then
