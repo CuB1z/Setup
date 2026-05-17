@@ -220,57 +220,6 @@ step "Postman"
 sudo snap install postman
 ok "Postman installed"
 
-# ── Ulauncher ─────────────────────────────────────────────────
-step "Ulauncher"
-sudo add-apt-repository universe -y
-sudo add-apt-repository ppa:agornostal/ulauncher -y
-sudo apt update && sudo apt install -y ulauncher
-
-# Stop any running ulauncher with SIGKILL so it doesn't dump its in-memory
-# settings over the file we're about to write
-pkill -9 -f ulauncher 2>/dev/null || true
-sleep 1
-
-# Config: Super+Space hotkey + hide tray indicator
-ULAUNCHER_CONFIG_DIR="$HOME/.config/ulauncher"
-mkdir -p "$ULAUNCHER_CONFIG_DIR"
-cat > "$ULAUNCHER_CONFIG_DIR/settings.json" << 'EOF'
-{
-  "blacklisted-desktop-dirs": "/usr/share/locale:/usr/share/app-install:/usr/share/kservices5:/usr/share/fk5:/usr/share/kservicetypes5:/usr/share/applications/screensavers:/usr/share/kde4:/usr/share/mimelnk",
-  "clear-previous-query": true,
-  "disable-desktop-filters": false,
-  "grab-mouse-pointer": false,
-  "hotkey-show-app": "<Super>space",
-  "render-on-screen": "mouse-pointer-monitor",
-  "show-indicator-icon": false,
-  "show-recent-apps": "0",
-  "terminal-command": "",
-  "theme-name": "dark"
-}
-EOF
-
-# Autostart on login so the hotkey works after reboot
-mkdir -p "$HOME/.config/autostart"
-cat > "$HOME/.config/autostart/ulauncher.desktop" << 'EOF'
-[Desktop Entry]
-Name=Ulauncher
-Comment=Application launcher
-GenericName=Launcher
-Categories=GNOME;GTK;Utility;
-Exec=env GDK_BACKEND=x11 ulauncher --hide-window --no-window-shadow
-Icon=ulauncher
-Terminal=false
-Type=Application
-X-GNOME-Autostart-enabled=true
-EOF
-
-# Launch now so the hotkey is live in the current session
-if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-  setsid ulauncher --hide-window </dev/null >/dev/null 2>&1 &
-  disown 2>/dev/null || true
-fi
-ok "Ulauncher installed and configured (Super+Space, indicator hidden)"
-
 # ── Spotify ───────────────────────────────────────────────────
 step "Spotify"
 sudo snap install spotify
@@ -749,9 +698,6 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
   # Window management shortcuts: Super+Q close, Super+F toggle maximize
   gsettings set org.gnome.desktop.wm.keybindings close "['<Super>q']" 2>/dev/null || true
   gsettings set org.gnome.desktop.wm.keybindings toggle-maximized "['<Super>f']" 2>/dev/null || true
-  # Free Super+Space (used by default to switch input sources) so Ulauncher can take it
-  gsettings set org.gnome.desktop.wm.keybindings switch-input-source "[]" 2>/dev/null || true
-  gsettings set org.gnome.desktop.wm.keybindings switch-input-source-backward "[]" 2>/dev/null || true
 
   # GNOME Terminal: set FiraCode Nerd Font on the default profile
   if command -v dconf &>/dev/null; then
