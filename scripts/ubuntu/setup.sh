@@ -70,13 +70,10 @@ warn "Extensions configured via policy — they install automatically when Brave
 ok "Brave extension policy created"
 
 # ── Brave bookmarks ───────────────────────────────────────────
-step "Brave bookmarks"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/brave_bookmarks.html" ]; then
+  step "Brave bookmarks"
   warn "brave_bookmarks.html found — import it manually via brave://bookmarks → Import"
-else
-  warn "To export your bookmarks: Brave → brave://bookmarks → ⋮ → Export bookmarks"
-  warn "Save the .html file as ubuntu/brave_bookmarks.html in your repo"
 fi
 
 # ── Docker + Docker Compose ───────────────────────────────────
@@ -131,7 +128,6 @@ cat > "$VSCODE_SETTINGS_DIR/settings.json" << 'EOF'
   "editor.fontSize": 14,
   "editor.lineHeight": 1.6,
   "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.tabSize": 2,
   "editor.minimap.enabled": false,
   "editor.bracketPairColorization.enabled": true,
@@ -188,10 +184,6 @@ cat > "$VSCODE_SETTINGS_DIR/settings.json" << 'EOF'
   "git.autofetch": true,
   "js/ts.updateImportsOnFileMove.enabled": "always",
 
-  "prettier.singleQuote": true,
-  "prettier.semi": true,
-  "prettier.printWidth": 100,
-  "prettier.trailingComma": "es5",
   "diffEditor.ignoreTrimWhitespace": false,
   "gitlens.ai.model": "vscode",
   "gitlens.ai.vscode.model": "copilot:gpt-4.1",
@@ -224,6 +216,11 @@ ok "Postman installed"
 step "Spotify"
 sudo snap install spotify
 ok "Spotify installed"
+
+# ── Discord ───────────────────────────────────────────────────
+step "Discord"
+sudo snap install discord
+ok "Discord installed"
 
 # ── Obsidian ──────────────────────────────────────────────────
 step "Obsidian"
