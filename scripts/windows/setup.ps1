@@ -435,22 +435,26 @@ if (Test-Path $wtDir) {
     Warn "Windows Terminal profile not found - open it once, then re-run"
 }
 
-# ── Disable startup apps ──────────────────────────────────────
-Step "Disabling startup apps"
-$startupApps = @(
-    "Spotify",
-    "Discord",
-    "EpicGamesLauncher"
-)
-
-Get-CimInstance Win32_StartupCommand | ForEach-Object {
-    foreach ($appName in $startupApps) {
-        if ($_.Name -like "*$appName*") {
-            $_ | Remove-CimInstance
-        }
+# ── Remove all startup apps ───────────────────────────────────
+# Clear every per-user autostart: the Run key values and the Startup folders.
+# HKLM Run is left alone so driver/system helpers keep working.
+Step "Removing all startup apps"
+$runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+if (Test-Path $runKey) {
+    foreach ($name in (Get-Item $runKey).Property) {
+        Remove-ItemProperty -Path $runKey -Name $name -ErrorAction SilentlyContinue
     }
 }
-Ok "Common startup apps disabled"
+$startupFolders = @(
+    [Environment]::GetFolderPath("Startup"),
+    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
+)
+foreach ($f in $startupFolders) {
+    if (Test-Path $f) {
+        Get-ChildItem -Path "$f\*" -Include *.lnk, *.url -File -ErrorAction SilentlyContinue | Remove-Item -Force
+    }
+}
+Ok "Startup apps removed (per-user Run + Startup folders)"
 
 # ── Desktop wallpaper ─────────────────────────────────────────
 Step "Setting desktop wallpaper"
