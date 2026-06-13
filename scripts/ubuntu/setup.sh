@@ -329,19 +329,24 @@ ok "Automatic security upgrades enabled"
 
 # ── Git global config ─────────────────────────────────────────
 step "Git global configuration"
-# Allow env var override for non-interactive (curl | bash) runs.
-# When piped, stdin is the script, so we read from /dev/tty.
-if [ -z "${GIT_NAME:-}" ]; then
+# Reuse existing git config (or env vars) so re-runs don't prompt again.
+# When piped (curl | bash), stdin is the script, so we read from /dev/tty.
+GIT_NAME="${GIT_NAME:-$(git config --global user.name 2>/dev/null || true)}"
+GIT_EMAIL="${GIT_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
+if [ -n "$GIT_NAME" ] && [ -n "$GIT_EMAIL" ]; then
+  ok "Git already configured for $GIT_NAME <$GIT_EMAIL> — skipping prompt"
+fi
+if [ -z "$GIT_NAME" ]; then
   echo -n "  Your name for Git (e.g. John Smith): "
   read -r GIT_NAME </dev/tty || true
 fi
-if [ -z "${GIT_EMAIL:-}" ]; then
+if [ -z "$GIT_EMAIL" ]; then
   echo -n "  Your email for Git (e.g. john@email.com): "
   read -r GIT_EMAIL </dev/tty || true
 fi
 
-git config --global user.name  "$GIT_NAME"
-git config --global user.email "$GIT_EMAIL"
+if [ -n "$GIT_NAME" ];  then git config --global user.name  "$GIT_NAME";  fi
+if [ -n "$GIT_EMAIL" ]; then git config --global user.email "$GIT_EMAIL"; fi
 git config --global init.defaultBranch main
 git config --global pull.rebase false
 git config --global core.editor "code --wait"
