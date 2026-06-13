@@ -227,6 +227,11 @@ step "Obsidian"
 snap list obsidian &>/dev/null || sudo snap install obsidian --classic
 ok "Obsidian installed"
 
+# ── DBeaver Community ─────────────────────────────────────────
+step "DBeaver"
+snap list dbeaver-ce &>/dev/null || sudo snap install dbeaver-ce
+ok "DBeaver installed"
+
 # ── Terminator ────────────────────────────────────────────────
 step "Terminator"
 sudo apt install -y terminator
@@ -691,6 +696,7 @@ terminator.desktop
 code.desktop code_code.desktop
 discord_discord.desktop discord.desktop
 postman_postman.desktop postman.desktop
+dbeaver-ce_dbeaver-ce.desktop dbeaver-ce.desktop dbeaver.desktop
 spotify_spotify.desktop spotify.desktop
 obsidian_obsidian.desktop obsidian.desktop
 docker-desktop.desktop

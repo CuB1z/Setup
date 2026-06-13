@@ -54,7 +54,7 @@ Includes:
 - Docker + Compose
 - VS Code + extensions + settings
 - Postman, Spotify, Obsidian
-- Postman, Spotify, Obsidian, Discord
+- Postman, Spotify, Obsidian, Discord, DBeaver
 - Terminator (clean theme + FiraCode Nerd Font)
 - nvm (Node LTS), pyenv (Python), SDKMAN (Java)
 - OpenCode
