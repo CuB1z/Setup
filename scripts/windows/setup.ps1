@@ -154,7 +154,7 @@ function Test-AppInstalled($namePatterns) {
 }
 
 # Skips if already installed (idempotent). Otherwise tries each winget id in order
-# (exit code 0 = success); if none install, opens the official download page once.
+# (exit code 0 = success); if none install, logs the official download URL.
 function Install-GpuSoftware($wingetIds, $fallbackUrl, $label, $detectPatterns) {
     if (Test-AppInstalled $detectPatterns) {
         Ok "$label already installed - skipping"
