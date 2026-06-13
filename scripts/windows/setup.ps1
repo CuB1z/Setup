@@ -112,17 +112,47 @@ Step "GPU Drivers"
 $gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name
 Write-Host "  Detected GPU: $gpu" -ForegroundColor White
 
+# Returns $true if any installed program's display name matches one of the patterns.
+function Test-AppInstalled($namePatterns) {
+    $uninstall = Get-ItemProperty `
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", `
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+        -ErrorAction SilentlyContinue
+    foreach ($pattern in $namePatterns) {
+        if ($uninstall | Where-Object { $_.DisplayName -like $pattern }) { return $true }
+    }
+    return $false
+}
+
+# Skips if already installed (idempotent). Otherwise tries each winget id in order
+# (exit code 0 = success); if none install, opens the official download page once.
+function Install-GpuSoftware($wingetIds, $fallbackUrl, $label, $detectPatterns) {
+    if (Test-AppInstalled $detectPatterns) {
+        Ok "$label already installed - skipping"
+        return
+    }
+    foreach ($id in $wingetIds) {
+        Write-Host "  Installing $label via winget ($id)..." -ForegroundColor White
+        winget install --id $id --exact --accept-package-agreements --accept-source-agreements --silent
+        if ($LASTEXITCODE -eq 0) {
+            Ok "$label installed via winget ($id)"
+            return
+        }
+        Warn "$label not installable via '$id' (winget exit $LASTEXITCODE)"
+    }
+    Warn "$label could not be installed silently - opening official download page"
+    Start-Process $fallbackUrl
+}
+
 if ($gpu -match "NVIDIA") {
-    Warn "NVIDIA detected. Installing GeForce Experience..."
-    winget install Nvidia.GeForceExperience --accept-package-agreements --accept-source-agreements --silent
-    Ok "GeForce Experience installed. Open it to install the latest drivers."
+    # NVIDIA App (the current driver suite) is blocked on winget; GeForce Experience
+    # is the only winget option but is being retired. Fall back to the NVIDIA App page.
+    Install-GpuSoftware @("Nvidia.GeForceExperience") "https://www.nvidia.com/en-us/software/nvidia-app/" "NVIDIA drivers" @("NVIDIA App", "NVIDIA GeForce Experience")
 } elseif ($gpu -match "AMD|Radeon") {
-    Warn "AMD detected. Installing AMD Software: Adrenalin Edition..."
-    winget install AMD.AdrenalinEdition --accept-package-agreements --accept-source-agreements --silent
-    Ok "AMD Adrenalin installed. Open it to install the latest drivers."
+    # AMD Adrenalin Edition is not published to winget - go straight to the download page.
+    Install-GpuSoftware @("AMD.AMDSoftwareAdrenalinEdition", "AMD.AMDSoftware") "https://www.amd.com/en/support/download/drivers.html" "AMD Adrenalin" @("AMD Software*")
 } elseif ($gpu -match "Intel") {
-    winget install Intel.GraphicsCommandCenter --accept-package-agreements --accept-source-agreements --silent
-    Ok "Intel Graphics Command Center installed."
+    Install-GpuSoftware @("Intel.GraphicsCommandCenter") "https://www.intel.com/content/www/us/en/download-center/home.html" "Intel Graphics" @("*Graphics Command Center*")
 } else {
     Warn "Could not detect GPU automatically. Install drivers manually."
 }
