@@ -481,6 +481,33 @@ Remove-ItemProperty -Path $taskband -Name "Favorites"        -ErrorAction Silent
 Remove-ItemProperty -Path $taskband -Name "FavoritesResolve" -ErrorAction SilentlyContinue
 Ok "Taskbar pins configured (Brave, Steam, Epic, Spotify, Discord, VS Code, Windows Terminal)"
 
+# ── Dual-boot clock (use UTC for the hardware clock) ─────────
+# Linux keeps the RTC in UTC by default; Windows assumes local time, so on a
+# dual boot the clock drifts by the timezone offset each switch. Making Windows
+# treat the RTC as UTC aligns it with Ubuntu and stops the time from breaking.
+Step "Fixing dual-boot clock (RTC as UTC)"
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" -Name "RealTimeIsUniversal" -Value 1 -Type DWord
+Ok "Windows now reads the hardware clock as UTC"
+
+# ── Clean up the desktop ──────────────────────────────────────
+# Remove shortcuts left by installers (only .lnk/.url, never real files).
+Step "Cleaning up the desktop"
+$desktops = @(
+    [Environment]::GetFolderPath("Desktop"),
+    "$env:PUBLIC\Desktop"
+)
+foreach ($d in $desktops) {
+    if (Test-Path $d) {
+        Get-ChildItem -Path $d -Include *.lnk, *.url -File -ErrorAction SilentlyContinue | Remove-Item -Force
+    }
+}
+
+# Hide the Recycle Bin from the desktop
+$hideIcons = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
+if (-not (Test-Path $hideIcons)) { New-Item -Path $hideIcons -Force | Out-Null }
+Set-ItemProperty -Path $hideIcons -Name "{645FF040-5081-101B-9F08-00AA002F954E}" -Value 1 -Type DWord
+Ok "Desktop cleared and Recycle Bin hidden"
+
 # ── Restart explorer to apply visual changes ──────────────────
 Stop-Process -Name explorer -Force
 Start-Process explorer
