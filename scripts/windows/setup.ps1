@@ -319,11 +319,24 @@ Ok "Common startup apps disabled"
 
 # ── Desktop wallpaper ─────────────────────────────────────────
 Step "Setting desktop wallpaper"
-$bgSrc = Join-Path $script_dir "..\..\assets\background.jpg"
-if (Test-Path $bgSrc) {
-    $picturesDir = [Environment]::GetFolderPath("MyPictures")
-    $wallpaperPath = Join-Path $picturesDir "background.jpg"
+$picturesDir = [Environment]::GetFolderPath("MyPictures")
+$wallpaperPath = Join-Path $picturesDir "background.jpg"
+
+# Use the local asset if running from a cloned repo; otherwise download it
+# (the script is meant to be run via `irm ... | iex`, where no file exists on disk).
+$bgSrc = if ($script_dir) { Join-Path $script_dir "..\..\assets\background.jpg" } else { $null }
+if ($bgSrc -and (Test-Path $bgSrc)) {
     Copy-Item $bgSrc $wallpaperPath -Force
+} else {
+    $bgUrl = "https://raw.githubusercontent.com/CuB1z/setup/main/assets/background.jpg"
+    try {
+        Invoke-WebRequest -Uri $bgUrl -OutFile $wallpaperPath -UseBasicParsing
+    } catch {
+        Warn "Could not download wallpaper from $bgUrl"
+    }
+}
+
+if (Test-Path $wallpaperPath) {
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -Value $wallpaperPath
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name WallpaperStyle -Value "10"
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name TileWallpaper -Value "0"
