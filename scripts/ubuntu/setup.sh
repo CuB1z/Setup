@@ -332,7 +332,7 @@ mkdir -p "$HOME/.config/terminator"
 cat > "$HOME/.config/terminator/config" << 'EOF'
 [global_config]
   handle_size = 0
-  inactive_color_offset = 0.6527777777777778
+  inactive_color_offset = 0.4
   ask_before_closing = never
 [keybindings]
 [profiles]
@@ -343,8 +343,10 @@ cat > "$HOME/.config/terminator/config" << 'EOF'
     show_titlebar = False
     use_system_font = False
     font = FiraCode Nerd Font 12
-    background_color = "#282828"
+    background_color = "#16181a"
     foreground_color = "#e8e8e8"
+    background_type = transparent
+    background_darkness = 0.95
     palette = "#282828:#cc241d:#a9a81d:#d79921:#419a9e:#b16286:#689d6a:#a89984:#928374:#fb4934:#d1ec31:#fabd2f:#8bd5d7:#d3869b:#8ec07c:#ebdbb2"
     use_theme_colors = False
     bold_is_bright = True
@@ -803,9 +805,12 @@ APPS
       dconf write "${PROFILE_PATH}font" "'FiraCode Nerd Font 12'" 2>/dev/null || true
       # Clean gruvbox dark — explicit colours (not theme colours, which pick up an ugly window bg)
       dconf write "${PROFILE_PATH}use-theme-colors" "false" 2>/dev/null || true
-      dconf write "${PROFILE_PATH}background-color" "'#282828'" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}background-color" "'#16181a'" 2>/dev/null || true
       dconf write "${PROFILE_PATH}foreground-color" "'#e8e8e8'" 2>/dev/null || true
       dconf write "${PROFILE_PATH}bold-is-bright" "true" 2>/dev/null || true
+      # A bit of background transparency (match Terminator)
+      dconf write "${PROFILE_PATH}use-transparent-background" "true" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}background-transparency-percent" "5" 2>/dev/null || true
       # Gruvbox ANSI palette — same 16 colours as the Terminator profile
       dconf write "${PROFILE_PATH}palette" "['#282828', '#cc241d', '#a9a81d', '#d79921', '#419a9e', '#b16286', '#689d6a', '#a89984', '#928374', '#fb4934', '#d1ec31', '#fabd2f', '#8bd5d7', '#d3869b', '#8ec07c', '#ebdbb2']" 2>/dev/null || true
       # ibeam cursor with Terminator's cursor colours
