@@ -358,8 +358,8 @@ Set-ItemProperty -Path $personalize -Name "SystemUsesLightTheme" -Value 0 -Type 
 # Disable transparency effects
 Set-ItemProperty -Path $personalize -Name "EnableTransparency"   -Value 0 -Type DWord
 
-# Red accent color (ABGR format 0x00BBGGRR -> red #FF1E1E)
-$accentColor = 0x001E1EFF
+# Vivid, fully-saturated red accent (#FF0000). ABGR format 0x00BBGGRR.
+$accentColor = 0x000000FF
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor"       -Value $accentColor -Type DWord
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorizationColor" -Value $accentColor -Type DWord
 # Don't tint title bars or the taskbar/Start - keep them dark (red only on highlights)
@@ -367,13 +367,13 @@ Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPreval
 Set-ItemProperty -Path $personalize -Name "ColorPrevalence" -Value 0 -Type DWord
 
 # AccentPalette drives the actual accent shade used for buttons/highlights/Start.
-# 8 RGBA shades, light -> dark, base #FF1E1E at index 3. Without this the palette
-# stays the default blue even though AccentColor (title bars) is red.
+# 8 RGBA shades, light -> dark, base #FF0000 at index 3. Green/blue stay at 0 so
+# the hue is pure red and the accent looks vivid rather than washed out.
 $accentKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent"
 if (-not (Test-Path $accentKey)) { New-Item -Path $accentKey -Force | Out-Null }
 $accentPalette = [byte[]](
-    0xFF,0xC9,0xC9,0x00,  0xFF,0xA3,0xA3,0x00,  0xFF,0x6B,0x6B,0x00,  0xFF,0x1E,0x1E,0x00,
-    0xD4,0x19,0x19,0x00,  0xA8,0x14,0x14,0x00,  0x7D,0x0F,0x0F,0x00,  0x52,0x0A,0x0A,0x00
+    0xFF,0x99,0x99,0x00,  0xFF,0x66,0x66,0x00,  0xFF,0x33,0x33,0x00,  0xFF,0x00,0x00,0x00,
+    0xD4,0x00,0x00,0x00,  0xA8,0x00,0x00,0x00,  0x7D,0x00,0x00,0x00,  0x52,0x00,0x00,0x00
 )
 Set-ItemProperty -Path $accentKey -Name "AccentPalette"   -Value $accentPalette -Type Binary
 Set-ItemProperty -Path $accentKey -Name "AccentColorMenu" -Value $accentColor -Type DWord
