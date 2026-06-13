@@ -415,20 +415,28 @@ New-Item -Path $ctxKey -Force | Out-Null
 Set-ItemProperty -Path $ctxKey -Name "(Default)" -Value "" -Type String
 Ok "Menus and taskbar cleaned"
 
-# ── Simplify Start menu ───────────────────────────────────────
-Step "Simplifying Start menu"
-# Layout: 1 = More pins (less of the Recommended area)
+# ── Empty the Start menu ──────────────────────────────────────
+Step "Emptying the Start menu"
+# Layout: 1 = More pins (shrinks the Recommended area)
 Set-ItemProperty -Path $advanced -Name "Start_Layout" -Value 1 -Type DWord
 # Hide recently added / most used / recommended files and tips
-Set-ItemProperty -Path $advanced -Name "Start_TrackDocs"           -Value 0 -Type DWord
-Set-ItemProperty -Path $advanced -Name "Start_TrackProgs"          -Value 0 -Type DWord
-Set-ItemProperty -Path $advanced -Name "Start_IrisRecommendations" -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_TrackDocs"            -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_TrackProgs"           -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_IrisRecommendations"  -Value 0 -Type DWord
 Set-ItemProperty -Path $advanced -Name "Start_AccountNotifications" -Value 0 -Type DWord
 # Disable Start menu suggestions / promoted content
 $contentKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
-Set-ItemProperty -Path $contentKey -Name "SystemPaneSuggestionsEnabled" -Value 0 -Type DWord
+Set-ItemProperty -Path $contentKey -Name "SystemPaneSuggestionsEnabled"    -Value 0 -Type DWord
 Set-ItemProperty -Path $contentKey -Name "SubscribedContent-338388Enabled" -Value 0 -Type DWord
-Ok "Start menu simplified (more pins, no recommendations/suggestions)"
+
+# Empty pinned list + hide the Recommended section (machine policy).
+# HideRecommendedSection is honored on Win11 22H2+; ConfigureStartPins replaces
+# the pinned grid with nothing. Note: full effect needs Pro/Enterprise/Education.
+$explorerPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer"
+if (-not (Test-Path $explorerPolicy)) { New-Item -Path $explorerPolicy -Force | Out-Null }
+Set-ItemProperty -Path $explorerPolicy -Name "ConfigureStartPins"      -Value '{"pinnedList":[]}' -Type String
+Set-ItemProperty -Path $explorerPolicy -Name "HideRecommendedSection"  -Value 1 -Type DWord
+Ok "Start menu emptied (no pins, no recommendations)"
 
 # ── Pin only our apps + Windows Terminal to the taskbar ──────
 # Win11 builds the taskbar pin list from LayoutModification.xml. We list the
