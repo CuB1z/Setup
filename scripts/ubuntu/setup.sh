@@ -28,6 +28,16 @@ if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
 fi
 ok "Base tools installed"
 
+# ── Home folder structure ─────────────────────────────────────
+step "Home folder structure"
+mkdir -p \
+  "$HOME/Dev/repos" \
+  "$HOME/Dev/sandbox" \
+  "$HOME/Dev/templates" \
+  "$HOME/Notes" \
+  "$HOME/Learning"
+ok "Folders ready (~/Dev/{repos,sandbox,templates}, ~/Notes, ~/Learning)"
+
 # ── FiraCode Nerd Font ────────────────────────────────────────
 step "FiraCode Nerd Font"
 FONT_DIR="$HOME/.local/share/fonts/NerdFonts"

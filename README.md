@@ -49,6 +49,7 @@ curl -sL https://raw.githubusercontent.com/CuB1z/setup/main/scripts/ubuntu/setup
 
 Includes:
 - Base development tools
+- Home folder structure (`~/Dev/{repos,sandbox,templates}`, `~/Notes`, `~/Learning`)
 - FiraCode Nerd Font
 - Brave + extension policy + settings policy + profile preferences (vertical tabs, grayscale theme, new-tab look)
 - Docker + Compose
