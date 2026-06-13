@@ -152,8 +152,9 @@ function Install-GpuSoftware($wingetIds, $fallbackUrl, $label, $detectPatterns) 
         }
         Warn "$label not installable via '$id' (winget exit $LASTEXITCODE)"
     }
-    Warn "$label could not be installed silently - opening official download page"
-    Start-Process $fallbackUrl
+    # Don't open the page: launching the browser leaves it running and blocks the
+    # Brave profile config later. Just log the URL for the user to grab afterwards.
+    Warn "$label could not be installed silently - download it manually from: $fallbackUrl"
 }
 
 if ($gpu -match "NVIDIA") {
@@ -608,6 +609,6 @@ Start-Process explorer
 Write-Host "`n============================================" -ForegroundColor Green
 Write-Host "  Setup complete." -ForegroundColor Green
 Write-Host "  Next steps:"
-Write-Host "  1. If a GPU download page opened, finish installing the drivers"
+Write-Host "  1. If a GPU driver URL was logged above, download and install it"
 Write-Host "  2. Sign out / restart to apply taskbar pins and all changes"
 Write-Host "============================================`n" -ForegroundColor Green
