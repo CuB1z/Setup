@@ -54,11 +54,13 @@ Includes:
 - Docker + Compose
 - VS Code + extensions + settings
 - Postman, Spotify, Obsidian
+- Postman, Spotify, Obsidian, Discord
+- Terminator (clean theme + FiraCode Nerd Font)
 - nvm (Node LTS), pyenv (Python), SDKMAN (Java)
 - OpenCode
 - Global Git configuration
-- tmux configuration
 - Managed block in `~/.bashrc` with aliases and functions (`new-ssh`, `update-all`)
+- GNOME tweaks: dark mode, dock layout (bottom, autohide, compact icons), apps pinned to the dock, desktop wallpaper, fixed workspaces with `Super`+1..4
 
 ## Useful Notes
 

@@ -19,7 +19,7 @@ sudo apt update && sudo apt upgrade -y
 step "Installing base tools"
 sudo apt install -y \
   git curl wget build-essential unzip ca-certificates gnupg lsb-release \
-  stow xclip xsel wl-clipboard fontconfig fzf tmux ripgrep bat eza apt-transport-https
+  stow xclip xsel wl-clipboard fontconfig fzf ripgrep bat eza apt-transport-https
 
 # bat may be called batcat on Ubuntu
 if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
@@ -80,7 +80,7 @@ fi
 step "Docker + Docker Compose"
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
 https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
@@ -209,23 +209,56 @@ ok "VSCode configured"
 
 # ── Postman ───────────────────────────────────────────────────
 step "Postman"
-sudo snap install postman
+snap list postman &>/dev/null || sudo snap install postman
 ok "Postman installed"
 
 # ── Spotify ───────────────────────────────────────────────────
 step "Spotify"
-sudo snap install spotify
+snap list spotify &>/dev/null || sudo snap install spotify
 ok "Spotify installed"
 
 # ── Discord ───────────────────────────────────────────────────
 step "Discord"
-sudo snap install discord
+snap list discord &>/dev/null || sudo snap install discord
 ok "Discord installed"
 
 # ── Obsidian ──────────────────────────────────────────────────
 step "Obsidian"
-sudo snap install obsidian --classic
+snap list obsidian &>/dev/null || sudo snap install obsidian --classic
 ok "Obsidian installed"
+
+# ── Terminator ────────────────────────────────────────────────
+step "Terminator"
+sudo apt install -y terminator
+mkdir -p "$HOME/.config/terminator"
+cat > "$HOME/.config/terminator/config" << 'EOF'
+[global_config]
+  handle_size = 0
+  inactive_color_offset = 0.6527777777777778
+  ask_before_closing = never
+[keybindings]
+[profiles]
+  [[default]]
+    cursor_shape = ibeam
+    cursor_fg_color = "#000000"
+    cursor_bg_color = "#aaaaaa"
+    show_titlebar = False
+    use_system_font = False
+    font = FiraCode Nerd Font 12
+    palette = "#282828:#cc241d:#a9a81d:#d79921:#419a9e:#b16286:#689d6a:#a89984:#928374:#fb4934:#d1ec31:#fabd2f:#8bd5d7:#d3869b:#8ec07c:#ebdbb2"
+    use_theme_colors = True
+    bold_is_bright = True
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+[plugins]
+EOF
+ok "Terminator installed and configured (clean theme + FiraCode Nerd Font)"
 
 # ── nvm + Node LTS (latest stable) ───────────────────────────
 step "nvm + Node.js LTS"
@@ -241,12 +274,12 @@ ok "Node LTS $(node -v) installed via nvm"
 step "pyenv + Python"
 sudo apt install -y make libssl-dev libffi-dev zlib1g-dev libbz2-dev \
   libreadline-dev libsqlite3-dev libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev
-curl https://pyenv.run | bash
+[ -d "$HOME/.pyenv" ] || curl https://pyenv.run | bash
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 LATEST_PYTHON=$(pyenv install --list | grep -E "^\s+3\.[0-9]+\.[0-9]+$" | tail -1 | tr -d ' ')
-pyenv install "$LATEST_PYTHON"
+pyenv install -s "$LATEST_PYTHON"
 pyenv global "$LATEST_PYTHON"
 ok "Python $LATEST_PYTHON installed via pyenv"
 
@@ -358,88 +391,6 @@ ok "Git configured for $GIT_NAME <$GIT_EMAIL>"
 step "fzf shell integration"
 # fzf already installed via apt — shell integrations added in .bashrc below
 ok "fzf ready"
-
-# ── tmux config ───────────────────────────────────────────────
-step "tmux configuration"
-cat > "$HOME/.tmux.conf" << 'EOF'
-# =============================================================
-#  tmux.conf — Beginner-friendly config
-#
-#  QUICK REFERENCE:
-#    Prefix:              Ctrl+a  (changed from Ctrl+b)
-#    New window:          Prefix + c
-#    Next / prev window:  Prefix + n / p
-#    List windows:        Prefix + w
-#    Split vertical:      Prefix + |
-#    Split horizontal:    Prefix + -
-#    Move between panes:  Prefix + h/j/k/l  (or arrow keys)
-#    Close pane:          Prefix + x
-#    Detach session:      Prefix + d
-#    Reattach:            tmux attach
-#    New named session:   tmux new -s name
-#    List sessions:       tmux ls
-#    Reload config:       Prefix + r
-# =============================================================
-
-# Change prefix to Ctrl+a (more ergonomic than Ctrl+b)
-unbind C-b
-set -g prefix C-a
-bind C-a send-prefix
-
-# Intuitive splits with | and -
-bind | split-window -h -c "#{pane_current_path}"
-bind - split-window -v -c "#{pane_current_path}"
-unbind '"'
-unbind %
-
-# Navigate panes with h/j/k/l (vim-style)
-bind h select-pane -L
-bind j select-pane -D
-bind k select-pane -U
-bind l select-pane -R
-
-# Resize panes with H/J/K/L
-bind H resize-pane -L 5
-bind J resize-pane -D 5
-bind K resize-pane -U 5
-bind L resize-pane -R 5
-
-# Reload config with Prefix + r
-bind r source-file ~/.tmux.conf \; display "Config reloaded"
-
-# New window opens in current directory
-bind c new-window -c "#{pane_current_path}"
-
-# Start window/pane numbering at 1 (easier to reach on keyboard)
-set -g base-index 1
-setw -g pane-base-index 1
-set -g renumber-windows on
-
-# Enable mouse (scroll, click to select pane)
-set -g mouse on
-
-# Larger scrollback history
-set -g history-limit 10000
-
-# No escape delay (better for vim/neovim)
-set -s escape-time 10
-
-# 256 color support
-set -g default-terminal "screen-256color"
-set -ga terminal-overrides ",xterm-256color:Tc"
-
-# Status bar
-set -g status-position bottom
-set -g status-bg colour234
-set -g status-fg colour137
-set -g status-left ' #[fg=colour39]#S '
-set -g status-right '#[fg=colour233,bg=colour241] %d/%m #[fg=colour233,bg=colour245] %H:%M '
-set -g status-right-length 50
-set -g status-left-length 20
-setw -g window-status-current-format ' #I:#W#[fg=colour50]* '
-setw -g window-status-format ' #I:#W '
-EOF
-ok "tmux configured — quick reference is in the comments at ~/.tmux.conf"
 
 # ── Bash shell profile ───────────────────────────────────────
 step "Writing Bash shell profile"
@@ -659,23 +610,29 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
   # Dark mode
   gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
   gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null || true
-  # Show seconds in the clock
-  gsettings set org.gnome.desktop.interface clock-show-seconds true 2>/dev/null || true
-  # Show weekday
-  gsettings set org.gnome.desktop.interface clock-show-weekday true 2>/dev/null || true
+  # Top-bar clock: date (month + day) and 24h time — no weekday, no seconds
+  gsettings set org.gnome.desktop.interface clock-show-date true 2>/dev/null || true
+  gsettings set org.gnome.desktop.interface clock-show-weekday false 2>/dev/null || true
+  gsettings set org.gnome.desktop.interface clock-show-seconds false 2>/dev/null || true
+  gsettings set org.gnome.desktop.interface clock-format '24h' 2>/dev/null || true
   # Disable natural scroll on mouse (keep on touchpad)
   gsettings set org.gnome.desktop.peripherals.mouse natural-scroll false 2>/dev/null || true
 
   # Spanish keyboard layout
   gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'es')]" 2>/dev/null || true
 
-  # Desktop background
-  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-  BG_SRC="$REPO_ROOT/assets/background.jpg"
+  # Desktop background — copy local asset, or download it (curl|bash runs have no local repo)
   BG_DEST="$HOME/Pictures/background.jpg"
+  mkdir -p "$HOME/Pictures"
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  BG_SRC="$REPO_ROOT/assets/background.jpg"
   if [ -f "$BG_SRC" ]; then
-    mkdir -p "$HOME/Pictures"
     cp "$BG_SRC" "$BG_DEST"
+  else
+    curl -fsSL "https://raw.githubusercontent.com/CuB1z/setup/main/assets/background.jpg" \
+      -o "$BG_DEST" 2>/dev/null || warn "Could not download desktop background"
+  fi
+  if [ -f "$BG_DEST" ]; then
     gsettings set org.gnome.desktop.background picture-uri "file://$BG_DEST" 2>/dev/null || true
     gsettings set org.gnome.desktop.background picture-uri-dark "file://$BG_DEST" 2>/dev/null || true
     gsettings set org.gnome.desktop.background picture-options 'zoom' 2>/dev/null || true
@@ -692,6 +649,59 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
   gsettings set org.gnome.shell.extensions.dash-to-dock hot-keys false 2>/dev/null || true
   gsettings set org.gnome.shell.extensions.dash-to-dock shortcut "[]" 2>/dev/null || true
 
+  # ── Ubuntu Dock layout (position, size, behaviour) ────────
+  DOCK=org.gnome.shell.extensions.dash-to-dock
+  gsettings set $DOCK dock-position 'BOTTOM' 2>/dev/null || true       # bottom of the screen
+  gsettings set $DOCK extend-height false 2>/dev/null || true          # centred floating dock, not full-width panel
+  gsettings set $DOCK dock-fixed false 2>/dev/null || true             # let it hide
+  gsettings set $DOCK autohide true 2>/dev/null || true
+  gsettings set $DOCK intellihide true 2>/dev/null || true             # only hide when a window overlaps it
+  gsettings set $DOCK intellihide-mode 'ALL_WINDOWS' 2>/dev/null || true
+  gsettings set $DOCK dash-max-icon-size 28 2>/dev/null || true        # compact icons
+  gsettings set $DOCK icon-size-fixed true 2>/dev/null || true
+  gsettings set $DOCK show-trash false 2>/dev/null || true
+  gsettings set $DOCK show-mounts false 2>/dev/null || true
+  gsettings set $DOCK show-apps-at-top false 2>/dev/null || true
+  gsettings set $DOCK running-indicator-style 'DOTS' 2>/dev/null || true
+  gsettings set $DOCK click-action 'focus-or-appspread' 2>/dev/null || true
+  gsettings set $DOCK scroll-action 'switch-workspace' 2>/dev/null || true
+  gsettings set $DOCK transparency-mode 'DEFAULT' 2>/dev/null || true
+  gsettings set $DOCK background-opacity 0.8 2>/dev/null || true
+  gsettings set $DOCK multi-monitor false 2>/dev/null || true
+
+  # ── Pin our apps to the dock (favorites) ──────────────────
+  # Only pin apps whose .desktop actually exists; each line lists candidate
+  # names (apt vs snap) and the first that exists on disk wins.
+  DESKTOP_DIRS=(/usr/share/applications "$HOME/.local/share/applications" /var/lib/snapd/desktop/applications)
+  _pick_desktop() {
+    local d f
+    for d in "${DESKTOP_DIRS[@]}"; do
+      for f in "$@"; do [ -f "$d/$f" ] && { echo "$f"; return 0; }; done
+    done
+    return 1
+  }
+  FAVORITES=()
+  while IFS= read -r cands; do
+    [ -z "$cands" ] && continue
+    picked=$(_pick_desktop $cands) && FAVORITES+=("$picked")
+  done << 'APPS'
+org.gnome.Nautilus.desktop
+brave-browser.desktop brave_brave.desktop com.brave.Browser.desktop
+terminator.desktop
+code.desktop code_code.desktop
+discord_discord.desktop discord.desktop
+postman_postman.desktop postman.desktop
+spotify_spotify.desktop spotify.desktop
+obsidian_obsidian.desktop obsidian.desktop
+docker-desktop.desktop
+OpenCode.desktop opencode.desktop
+APPS
+  if [ ${#FAVORITES[@]} -gt 0 ]; then
+    fav_list=$(printf "'%s', " "${FAVORITES[@]}"); fav_list="[${fav_list%, }]"
+    gsettings set org.gnome.shell favorite-apps "$fav_list" 2>/dev/null || true
+    ok "Pinned ${#FAVORITES[@]} apps to the dock"
+  fi
+
   # Window management shortcuts: Super+Q close, Super+F toggle maximize
   gsettings set org.gnome.desktop.wm.keybindings close "['<Super>q']" 2>/dev/null || true
   gsettings set org.gnome.desktop.wm.keybindings toggle-maximized "['<Super>f']" 2>/dev/null || true
@@ -705,7 +715,7 @@ if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
       dconf write "${PROFILE_PATH}font" "'FiraCode Nerd Font 12'" 2>/dev/null || true
     fi
   fi
-  ok "GNOME tweaks applied (dark mode, terminal font)"
+  ok "GNOME tweaks applied (dark mode, dock layout, pinned apps, wallpaper, terminal font)"
 else
   warn "GNOME not detected — skipping GNOME tweaks"
 fi
@@ -718,7 +728,6 @@ echo -e "  2. ${CYAN}new-ssh${NC} — generate your SSH key and copy it to GitHu
 echo -e "  3. ${CYAN}sdk install java${NC} — if auto-install failed"
 echo -e "  4. ${CYAN}update-all${NC} — to update everything in the future"
 echo -e "  5. Open Brave and verify Bitwarden installed"
-echo -e "  6. Set your terminal font to ${CYAN}FiraCode Nerd Font${NC}"
-echo -e "  7. Read ${CYAN}~/.tmux.conf${NC} for the tmux quick reference"
-echo -e "  8. Restart so Docker works without sudo"
+echo -e "  6. Restart so Docker works without sudo"
+echo -e "  7. Log out/in if the dock layout or pinned apps didn't refresh"
 echo -e "${GREEN}============================================${NC}\n"
