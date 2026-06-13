@@ -337,8 +337,10 @@ if (Test-Path $wtDir) {
         try { $wt = ConvertTo-HashtableDeep (Get-Content $wtSettings -Raw | ConvertFrom-Json) } catch { $wt = @{} }
     }
 
-    # No tabs/title bar + maximized window (keeps the border and taskbar)
-    $wt["launchMode"] = "maximizedFocus"
+    # Maximized window with the title bar/window controls (X) visible. WT can't
+    # hide the tab strip without focus mode, which also hides the title bar, so
+    # keep tabs in the title bar to get a quick close button.
+    $wt["launchMode"] = "maximized"
 
     # Look & feel applied to every profile
     if ($wt["profiles"] -isnot [hashtable])              { $wt["profiles"] = @{} }
