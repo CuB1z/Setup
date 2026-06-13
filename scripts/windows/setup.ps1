@@ -362,14 +362,23 @@ Set-ItemProperty -Path $personalize -Name "EnableTransparency"   -Value 0 -Type 
 $accentColor = 0x001E1EFF
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor"       -Value $accentColor -Type DWord
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorizationColor" -Value $accentColor -Type DWord
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence"   -Value 1 -Type DWord
+# Don't tint title bars or the taskbar/Start - keep them dark (red only on highlights)
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence" -Value 0 -Type DWord
+Set-ItemProperty -Path $personalize -Name "ColorPrevalence" -Value 0 -Type DWord
 
-# Apply accent to Start menu and taskbar
+# AccentPalette drives the actual accent shade used for buttons/highlights/Start.
+# 8 RGBA shades, light -> dark, base #FF1E1E at index 3. Without this the palette
+# stays the default blue even though AccentColor (title bars) is red.
 $accentKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent"
 if (-not (Test-Path $accentKey)) { New-Item -Path $accentKey -Force | Out-Null }
+$accentPalette = [byte[]](
+    0xFF,0xC9,0xC9,0x00,  0xFF,0xA3,0xA3,0x00,  0xFF,0x6B,0x6B,0x00,  0xFF,0x1E,0x1E,0x00,
+    0xD4,0x19,0x19,0x00,  0xA8,0x14,0x14,0x00,  0x7D,0x0F,0x0F,0x00,  0x52,0x0A,0x0A,0x00
+)
+Set-ItemProperty -Path $accentKey -Name "AccentPalette"   -Value $accentPalette -Type Binary
 Set-ItemProperty -Path $accentKey -Name "AccentColorMenu" -Value $accentColor -Type DWord
 Set-ItemProperty -Path $accentKey -Name "StartColorMenu"  -Value $accentColor -Type DWord
-Ok "Dark mode + red accent applied"
+Ok "Dark mode + red accent applied (highlights only, dark title bars/taskbar)"
 
 # ── Disable animations ────────────────────────────────────────
 Step "Disabling animations"
