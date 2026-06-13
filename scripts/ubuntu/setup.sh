@@ -680,47 +680,6 @@ step "GNOME Shell Extension Manager"
 sudo apt install -y gnome-shell-extension-manager
 ok "gnome-shell-extension-manager installed"
 
-# ── GNOME Shell extensions ────────────────────────────────────
-step "GNOME Shell extensions"
-install_gnome_extension() {
-  local uuid="$1"
-  if ! command -v gnome-shell &>/dev/null || ! command -v gnome-extensions &>/dev/null; then
-    warn "GNOME Shell not available — skipping $uuid"
-    return 0
-  fi
-  local shell_version
-  shell_version=$(gnome-shell --version | grep -oE '[0-9]+' | head -1)
-  local info
-  info=$(curl -fsS "https://extensions.gnome.org/extension-info/?uuid=${uuid}&shell_version=${shell_version}" 2>/dev/null) || {
-    warn "Could not query extensions.gnome.org for $uuid"
-    return 0
-  }
-  local version_tag
-  version_tag=$(echo "$info" | grep -oE '"version_tag":[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | head -1)
-  if [ -z "$version_tag" ]; then
-    warn "No compatible version of $uuid for GNOME $shell_version"
-    return 0
-  fi
-  local tmp
-  tmp=$(mktemp -d)
-  if curl -fsSL "https://extensions.gnome.org/download-extension/${uuid}.shell-extension.zip?version_tag=${version_tag}" -o "$tmp/ext.zip"; then
-    gnome-extensions install -f "$tmp/ext.zip" 2>/dev/null || warn "Failed to install $uuid"
-    gnome-extensions enable "$uuid" 2>/dev/null || warn "Enable $uuid after restarting GNOME Shell"
-    ok "Installed $uuid"
-  else
-    warn "Could not download $uuid"
-  fi
-  rm -rf "$tmp"
-}
-
-GNOME_EXTENSIONS=(
-  "space-bar@luchrioh"
-)
-for ext in "${GNOME_EXTENSIONS[@]}"; do
-  install_gnome_extension "$ext"
-done
-warn "Log out and back in (or restart GNOME Shell) to fully activate extensions"
-
 # ── GNOME tweaks ──────────────────────────────────────────────
 step "GNOME tweaks"
 if command -v gsettings &>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
