@@ -187,17 +187,55 @@ if ($gpu -match "NVIDIA") {
     Warn "Could not detect GPU automatically. Install drivers manually."
 }
 
-# ── Remove bloatware ──────────────────────────────────────────
+# ── Remove bloatware (Edge, Copilot, etc.) ───────────────────
 Step "Removing bloatware"
 $bloat = @(
-    "*xbox*", "*solitaire*", "*BingWeather*", "*ZuneMusic*",
-    "*ZuneVideo*", "*MixedReality*", "*SkypeApp*", "*GetHelp*",
-    "*Getstarted*", "*windowscommunicationsapps*"
+    "*xbox*", "*solitaire*", "*BingWeather*", "*BingNews*", "*BingSearch*",
+    "*ZuneMusic*", "*ZuneVideo*", "*MixedReality*", "*SkypeApp*", "*GetHelp*",
+    "*Getstarted*", "*windowscommunicationsapps*", "*Copilot*", "*Cortana*",
+    "*MicrosoftTeams*", "*YourPhone*", "*Clipchamp*", "*WindowsFeedbackHub*",
+    "*OutlookForWindows*", "*WindowsMaps*", "*Microsoft.People*",
+    "*PowerAutomateDesktop*", "*Microsoft.Windows.DevHome*", "*QuickAssist*"
 )
 foreach ($app in $bloat) {
-    Get-AppxPackage $app | Remove-AppxPackage
+    Get-AppxPackage -AllUsers $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+    # Stop it coming back for new users / after feature updates
+    Get-AppxProvisionedPackage -Online |
+        Where-Object { $_.DisplayName -like $app } |
+        Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Out-Null
 }
-Ok "Bloatware removed"
+Ok "Bloatware Appx packages removed"
+
+# Disable Copilot (policy + taskbar button)
+foreach ($hive in @("HKCU", "HKLM")) {
+    $copilotKey = "${hive}:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot"
+    if (-not (Test-Path $copilotKey)) { New-Item -Path $copilotKey -Force | Out-Null }
+    Set-ItemProperty -Path $copilotKey -Name "TurnOffWindowsCopilot" -Value 1 -Type DWord
+}
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowCopilotButton" -Value 0 -Type DWord
+Ok "Copilot disabled"
+
+# Disable Bing / web results in Windows Search
+$searchPol = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
+if (-not (Test-Path $searchPol)) { New-Item -Path $searchPol -Force | Out-Null }
+Set-ItemProperty -Path $searchPol -Name "DisableWebSearch"      -Value 1 -Type DWord
+Set-ItemProperty -Path $searchPol -Name "ConnectedSearchUseWeb" -Value 0 -Type DWord
+Set-ItemProperty -Path $searchPol -Name "AllowCortana"          -Value 0 -Type DWord
+$searchHKCU = "HKCU:\Software\Policies\Microsoft\Windows\Explorer"
+if (-not (Test-Path $searchHKCU)) { New-Item -Path $searchHKCU -Force | Out-Null }
+Set-ItemProperty -Path $searchHKCU -Name "DisableSearchBoxSuggestions" -Value 1 -Type DWord
+Ok "Bing/web search disabled in Start"
+
+# Uninstall Microsoft Edge. Officially removable in the EEA/EU under the Digital
+# Markets Act; elsewhere winget will fail and it must be removed from Settings.
+Step "Uninstalling Microsoft Edge"
+winget uninstall --id Microsoft.Edge --exact --silent --accept-source-agreements
+if ($LASTEXITCODE -eq 0) {
+    Ok "Microsoft Edge uninstalled"
+} else {
+    Warn "Could not uninstall Edge via winget (exit $LASTEXITCODE)"
+    Warn "In the EU: Settings > Apps > Installed apps > Microsoft Edge > Uninstall"
+}
 
 # ── Brave extensions (via managed policy) ────────────────────
 Step "Brave extensions"
