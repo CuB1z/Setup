@@ -57,14 +57,14 @@ sudo tee "$BRAVE_POLICY_DIR/extensions.json" > /dev/null << 'EOF'
 {
   "ExtensionInstallForcelist": [
     "nngceckbapebfimnlniiiahkandclblb;https://clients2.google.com/service/update2/crx",
-    "lpcaedmchfhocbbapmcbpinfpgnhiddi;https://clients2.google.com/service/update2/crx",
-    "eimadpbcbfnmbkopoojfekhnkhdbieeh;https://clients2.google.com/service/update2/crx"
+    "bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc;https://clients2.google.com/service/update2/crx",
+    "ckkdlimhmcjmikdlpkmbgfkaikojcbjk;https://clients2.google.com/service/update2/crx"
   ]
 }
 EOF
 # nngceckbapebfimnlniiiahkandclblb = Bitwarden
-# lpcaedmchfhocbbapmcbpinfpgnhiddi = Material Icons for GitHub
-# eimadpbcbfnmbkopoojfekhnkhdbieeh = Markdown Viewer
+# bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc = Material Icons for GitHub
+# ckkdlimhmcjmikdlpkmbgfkaikojcbjk = Markdown Viewer
 
 warn "Extensions configured via policy — they install automatically when Brave opens."
 ok "Brave extension policy created"
