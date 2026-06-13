@@ -348,7 +348,24 @@ cat > "$HOME/.config/terminator/config" << 'EOF'
       parent = window0
 [plugins]
 EOF
-ok "Terminator installed and configured (clean theme + FiraCode Nerd Font)"
+
+# Custom Terminator launcher icon, via a user-level .desktop override
+ICON_DEST="$HOME/.local/share/icons/terminator-custom.png"
+mkdir -p "$HOME/.local/share/icons"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+if [ -f "$REPO_ROOT/assets/terminator-icon.png" ]; then
+  cp "$REPO_ROOT/assets/terminator-icon.png" "$ICON_DEST"
+else
+  curl -fsSL "https://raw.githubusercontent.com/CuB1z/setup/main/assets/terminator-icon.png" \
+    -o "$ICON_DEST" 2>/dev/null || warn "Could not fetch Terminator icon"
+fi
+if [ -f "$ICON_DEST" ] && [ -f /usr/share/applications/terminator.desktop ]; then
+  mkdir -p "$HOME/.local/share/applications"
+  sed "s|^Icon=.*|Icon=$ICON_DEST|" /usr/share/applications/terminator.desktop \
+    > "$HOME/.local/share/applications/terminator.desktop"
+  update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+fi
+ok "Terminator installed and configured (clean theme + FiraCode Nerd Font + custom icon)"
 
 # ── nvm + Node LTS (latest stable) ───────────────────────────
 step "nvm + Node.js LTS"
@@ -387,6 +404,11 @@ ok "Java $JAVA_VERSION installed via SDKMAN"
 step "OpenCode"
 curl -fsSL https://opencode.ai/install | bash && ok "OpenCode installed" || \
   warn "Install OpenCode manually: curl -fsSL https://opencode.ai/install | bash"
+
+# ── Claude Code ───────────────────────────────────────────────
+step "Claude Code"
+curl -fsSL https://claude.ai/install.sh | bash && ok "Claude Code installed" || \
+  warn "Install Claude Code manually: curl -fsSL https://claude.ai/install.sh | bash"
 
 # ── GitHub CLI ────────────────────────────────────────────────
 step "GitHub CLI"

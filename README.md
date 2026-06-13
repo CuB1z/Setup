@@ -53,11 +53,10 @@ Includes:
 - Brave + extension policy + settings policy + profile preferences (vertical tabs, grayscale theme, new-tab look)
 - Docker + Compose
 - VS Code + extensions + settings
-- Postman, Spotify, Obsidian
 - Postman, Spotify, Obsidian, Discord, DBeaver
-- Terminator (clean theme + FiraCode Nerd Font)
+- Terminator (clean theme + FiraCode Nerd Font + custom icon)
 - nvm (Node LTS), pyenv (Python), SDKMAN (Java)
-- OpenCode
+- OpenCode, Claude Code
 - Global Git configuration
 - Managed block in `~/.bashrc` with aliases and functions (`new-ssh`, `update-all`)
 - GNOME tweaks: dark mode, dock layout (bottom, autohide, compact icons), apps pinned to the dock, desktop wallpaper, fixed workspaces with `Super`+1..4
