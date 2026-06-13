@@ -94,13 +94,6 @@ Set-ItemProperty -Path "HKCU:\Control Panel\Mouse" -Name "MouseThreshold2" -Valu
 New-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling" -Force | Out-Null
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling" -Name "PowerThrottlingOff" -Value 1 -Type DWord
 
-# Disable transparency effects
-New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Force | Out-Null
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Type DWord
-
-# Disable Windows animations
-Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value ([byte[]](0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00))
-
 # Prioritize foreground apps
 New-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl" -Force | Out-Null
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl" -Name "Win32PrioritySeparation" -Value 26 -Type DWord
@@ -350,27 +343,136 @@ public class Wallpaper {
     [Wallpaper]::SystemParametersInfo(20, 0, $wallpaperPath, 3) | Out-Null
     Ok "Wallpaper set to $wallpaperPath"
 } else {
-    Warn "assets\background.jpg not found — skipping wallpaper"
+    Warn "background.jpg unavailable (local + download failed) — skipping wallpaper"
 }
 
-# ── Enable Dark Mode  ─────────────────────────────────────────
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
-  -Name "AppsUseLightTheme" -Value 0
+# ── Personalization: Dark Mode + Red Accent ───────────────────
+Step "Personalization (Dark Mode + Red Accent)"
+$personalize = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+if (-not (Test-Path $personalize)) { New-Item -Path $personalize -Force | Out-Null }
 
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
-  -Name "SystemUsesLightTheme" -Value 0
+# Dark mode for apps and system
+Set-ItemProperty -Path $personalize -Name "AppsUseLightTheme"    -Value 0 -Type DWord
+Set-ItemProperty -Path $personalize -Name "SystemUsesLightTheme" -Value 0 -Type DWord
 
+# Disable transparency effects
+Set-ItemProperty -Path $personalize -Name "EnableTransparency"   -Value 0 -Type DWord
+
+# Red accent color (ABGR format 0x00BBGGRR -> red #FF1E1E)
 $accentColor = 0x001E1EFF
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor"       -Value $accentColor -Type DWord
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorizationColor" -Value $accentColor -Type DWord
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence"   -Value 1 -Type DWord
 
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" `
-  -Name "AccentColor" -Value $accentColor
+# Apply accent to Start menu and taskbar
+$accentKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent"
+if (-not (Test-Path $accentKey)) { New-Item -Path $accentKey -Force | Out-Null }
+Set-ItemProperty -Path $accentKey -Name "AccentColorMenu" -Value $accentColor -Type DWord
+Set-ItemProperty -Path $accentKey -Name "StartColorMenu"  -Value $accentColor -Type DWord
+Ok "Dark mode + red accent applied"
 
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" `
-  -Name "ColorizationColor" -Value $accentColor
+# ── Disable animations ────────────────────────────────────────
+Step "Disabling animations"
+Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value ([byte[]](0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)) -Type Binary
+Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0" -Type String
+$vfx = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
+if (-not (Test-Path $vfx)) { New-Item -Path $vfx -Force | Out-Null }
+Set-ItemProperty -Path $vfx -Name "VisualFXSetting" -Value 2 -Type DWord
+Ok "Animations disabled"
 
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" `
-  -Name "ColorPrevalence" -Value 1
+# ── Disable Widgets ───────────────────────────────────────────
+Step "Disabling Widgets"
+# Remove Widgets button from the taskbar
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -Type DWord
+# Block Widgets / News and Interests via machine policy
+$dshPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Dsh"
+if (-not (Test-Path $dshPolicy)) { New-Item -Path $dshPolicy -Force | Out-Null }
+Set-ItemProperty -Path $dshPolicy -Name "AllowNewsAndInterests" -Value 0 -Type DWord
+Ok "Widgets disabled"
 
+# ── Clean up menus & taskbar ──────────────────────────────────
+Step "Cleaning up menus and taskbar"
+$advanced = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+# Remove Chat and Task View buttons from the taskbar
+Set-ItemProperty -Path $advanced -Name "TaskbarMn"          -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "ShowTaskViewButton" -Value 0 -Type DWord
+# Collapse the taskbar search box (0 = hidden)
+$searchKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"
+if (-not (Test-Path $searchKey)) { New-Item -Path $searchKey -Force | Out-Null }
+Set-ItemProperty -Path $searchKey -Name "SearchboxTaskbarMode" -Value 0 -Type DWord
+# Restore the classic full context menu (removes the Win11 "Show more options" extra click)
+$ctxKey = "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
+New-Item -Path $ctxKey -Force | Out-Null
+Set-ItemProperty -Path $ctxKey -Name "(Default)" -Value "" -Type String
+Ok "Menus and taskbar cleaned"
+
+# ── Simplify Start menu ───────────────────────────────────────
+Step "Simplifying Start menu"
+# Layout: 1 = More pins (less of the Recommended area)
+Set-ItemProperty -Path $advanced -Name "Start_Layout" -Value 1 -Type DWord
+# Hide recently added / most used / recommended files and tips
+Set-ItemProperty -Path $advanced -Name "Start_TrackDocs"           -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_TrackProgs"          -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_IrisRecommendations" -Value 0 -Type DWord
+Set-ItemProperty -Path $advanced -Name "Start_AccountNotifications" -Value 0 -Type DWord
+# Disable Start menu suggestions / promoted content
+$contentKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
+Set-ItemProperty -Path $contentKey -Name "SystemPaneSuggestionsEnabled" -Value 0 -Type DWord
+Set-ItemProperty -Path $contentKey -Name "SubscribedContent-338388Enabled" -Value 0 -Type DWord
+Ok "Start menu simplified (more pins, no recommendations/suggestions)"
+
+# ── Pin only our apps + Windows Terminal to the taskbar ──────
+# Win11 builds the taskbar pin list from LayoutModification.xml. We list the
+# Start-menu shortcuts that actually exist (broken entries are skipped) plus
+# Windows Terminal by AUMID, then clear the cached pins so it regenerates.
+Step "Configuring taskbar pins"
+
+$startMenuRoots = @(
+    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
+    "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
+)
+$wantedApps = @("Brave", "Steam", "Epic Games Launcher", "Spotify", "Discord", "Visual Studio Code")
+
+$desktopEntries = ""
+foreach ($name in $wantedApps) {
+    $lnk = Get-ChildItem -Path $startMenuRoots -Recurse -Filter "$name.lnk" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($lnk) {
+        $desktopEntries += "        <taskbar:DesktopApp DesktopApplicationLinkPath=`"$($lnk.FullName)`" />`n"
+        Write-Host "  Pinning: $name" -ForegroundColor White
+    } else {
+        Warn "Shortcut for '$name' not found - skipping"
+    }
+}
+
+$layoutXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<LayoutModificationTemplate
+    xmlns="http://schemas.microsoft.com/Start/2014/LayoutModification"
+    xmlns:defaultlayout="http://schemas.microsoft.com/Start/2014/FullDefaultLayout"
+    xmlns:start="http://schemas.microsoft.com/Start/2014/StartLayout"
+    xmlns:taskbar="http://schemas.microsoft.com/Start/2014/TaskbarLayout"
+    Version="1">
+  <CustomTaskbarLayoutCollection PinListPlacement="Replace">
+    <defaultlayout:TaskbarLayout>
+      <taskbar:TaskbarPinList>
+$desktopEntries        <taskbar:UWA AppUserModelID="Microsoft.WindowsTerminal_8wekyb3d8bbwe!App" />
+      </taskbar:TaskbarPinList>
+    </defaultlayout:TaskbarLayout>
+  </CustomTaskbarLayoutCollection>
+</LayoutModificationTemplate>
+"@
+
+$shellDir = "$env:LOCALAPPDATA\Microsoft\Windows\Shell"
+New-Item -Path $shellDir -ItemType Directory -Force | Out-Null
+Set-Content -Path (Join-Path $shellDir "LayoutModification.xml") -Value $layoutXml -Encoding UTF8
+
+# Clear cached taskbar pins so Windows rebuilds them from the layout
+$taskband = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+Remove-ItemProperty -Path $taskband -Name "Favorites"        -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path $taskband -Name "FavoritesResolve" -ErrorAction SilentlyContinue
+Ok "Taskbar pins configured (Brave, Steam, Epic, Spotify, Discord, VS Code, Windows Terminal)"
+
+# ── Restart explorer to apply visual changes ──────────────────
 Stop-Process -Name explorer -Force
 Start-Process explorer
 
@@ -378,6 +480,6 @@ Start-Process explorer
 Write-Host "`n============================================" -ForegroundColor Green
 Write-Host "  Setup complete." -ForegroundColor Green
 Write-Host "  Next steps:"
-Write-Host "  1. Open GeForce Experience / AMD Adrenalin and install drivers"
-Write-Host "  2. Restart to apply all changes"
+Write-Host "  1. If a GPU download page opened, finish installing the drivers"
+Write-Host "  2. Sign out / restart to apply taskbar pins and all changes"
 Write-Host "============================================`n" -ForegroundColor Green
