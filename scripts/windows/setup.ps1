@@ -11,6 +11,25 @@ function Step($msg) { Write-Host "`n== $msg ==" -ForegroundColor Cyan }
 function Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "[!] $msg" -ForegroundColor Yellow }
 
+# Deep-convert ConvertFrom-Json output (PSCustomObject) to nested hashtables, so
+# JSON config files (Brave Preferences, Windows Terminal settings) can be merged.
+function ConvertTo-HashtableDeep($obj) {
+    if ($obj -is [System.Collections.IDictionary]) {
+        $h = @{}; foreach ($k in $obj.Keys) { $h[$k] = ConvertTo-HashtableDeep $obj[$k] }; return $h
+    } elseif ($obj -is [PSCustomObject]) {
+        $h = @{}; foreach ($p in $obj.PSObject.Properties) { $h[$p.Name] = ConvertTo-HashtableDeep $p.Value }; return $h
+    } elseif ($obj -is [System.Collections.IEnumerable] -and $obj -isnot [string]) {
+        return @($obj | ForEach-Object { ConvertTo-HashtableDeep $_ })
+    } else { return $obj }
+}
+function Merge-Hashtable($dst, $src) {
+    foreach ($k in $src.Keys) {
+        if (($src[$k] -is [hashtable]) -and ($dst[$k] -is [hashtable])) {
+            Merge-Hashtable $dst[$k] $src[$k]
+        } else { $dst[$k] = $src[$k] }
+    }
+}
+
 # ── Windows Update ────────────────────────────────────────────
 Step "Windows Update"
 if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
@@ -222,23 +241,6 @@ Step "Brave profile preferences"
 if (Get-Process -Name brave -ErrorAction SilentlyContinue) {
     Warn "Brave is running - close it and re-run to apply its profile preferences"
 } else {
-    function ConvertTo-HashtableDeep($obj) {
-        if ($obj -is [System.Collections.IDictionary]) {
-            $h = @{}; foreach ($k in $obj.Keys) { $h[$k] = ConvertTo-HashtableDeep $obj[$k] }; return $h
-        } elseif ($obj -is [PSCustomObject]) {
-            $h = @{}; foreach ($p in $obj.PSObject.Properties) { $h[$p.Name] = ConvertTo-HashtableDeep $p.Value }; return $h
-        } elseif ($obj -is [System.Collections.IEnumerable] -and $obj -isnot [string]) {
-            return @($obj | ForEach-Object { ConvertTo-HashtableDeep $_ })
-        } else { return $obj }
-    }
-    function Merge-Hashtable($dst, $src) {
-        foreach ($k in $src.Keys) {
-            if (($src[$k] -is [hashtable]) -and ($dst[$k] -is [hashtable])) {
-                Merge-Hashtable $dst[$k] $src[$k]
-            } else { $dst[$k] = $src[$k] }
-        }
-    }
-
     $braveProfile = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default"
     $prefsPath = Join-Path $braveProfile "Preferences"
     New-Item -Path $braveProfile -ItemType Directory -Force | Out-Null
@@ -291,6 +293,59 @@ $braveBookmarks = Join-Path $script_dir "brave_bookmarks.html"
 if (Test-Path $braveBookmarks) {
     Step "Brave bookmarks"
     Warn "brave_bookmarks.html found - import it manually via brave://bookmarks -> Import"
+}
+
+# ── Windows Terminal (Ubuntu-like theme, no tabs, maximized) ──
+# Focus mode (no tabs/title bar) + maximized window, gruvbox palette mirroring
+# the Ubuntu/Terminator profile. Merged into settings.json so nothing else is lost.
+Step "Configuring Windows Terminal"
+$wtSettings = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+$wtDir = Split-Path -Parent $wtSettings
+if (Test-Path $wtDir) {
+    $wt = @{}
+    if (Test-Path $wtSettings) {
+        try { $wt = ConvertTo-HashtableDeep (Get-Content $wtSettings -Raw | ConvertFrom-Json) } catch { $wt = @{} }
+    }
+
+    # No tabs/title bar + maximized window (keeps the border and taskbar)
+    $wt["launchMode"] = "maximizedFocus"
+
+    # Look & feel applied to every profile
+    if ($wt["profiles"] -isnot [hashtable])              { $wt["profiles"] = @{} }
+    if ($wt["profiles"]["defaults"] -isnot [hashtable])  { $wt["profiles"]["defaults"] = @{} }
+    Merge-Hashtable $wt["profiles"]["defaults"] @{
+        colorScheme      = "Ubuntu Gruvbox"
+        opacity          = 95
+        useAcrylic       = $false
+        cursorShape      = "bar"
+        intenseTextStyle = "bright"
+        padding          = "8"
+        font             = @{ face = "FiraCode Nerd Font"; size = 12 }
+    }
+
+    # Gruvbox scheme = same 16 ANSI colours as the Ubuntu profile
+    $scheme = @{
+        name = "Ubuntu Gruvbox"
+        background  = "#16181A"; foreground = "#E8E8E8"
+        cursorColor = "#AAAAAA"; selectionBackground = "#3C3836"
+        black = "#282828"; red = "#CC241D"; green = "#A9A81D"; yellow = "#D79921"
+        blue  = "#419A9E"; purple = "#B16286"; cyan = "#689D6A"; white = "#A89984"
+        brightBlack = "#928374"; brightRed = "#FB4934"; brightGreen = "#D1EC31"; brightYellow = "#FABD2F"
+        brightBlue  = "#8BD5D7"; brightPurple = "#D3869B"; brightCyan = "#8EC07C"; brightWhite = "#EBDBB2"
+    }
+    $schemes = @()
+    if ($wt["schemes"]) { $schemes = @($wt["schemes"] | Where-Object { $_.name -ne "Ubuntu Gruvbox" }) }
+    $schemes += $scheme
+    $wt["schemes"] = $schemes
+
+    try {
+        $wt | ConvertTo-Json -Depth 50 | Set-Content -Path $wtSettings -Encoding UTF8
+        Ok "Windows Terminal themed (Ubuntu Gruvbox, no tabs, maximized + focus)"
+    } catch {
+        Warn "Could not write Windows Terminal settings"
+    }
+} else {
+    Warn "Windows Terminal profile not found - open it once, then re-run"
 }
 
 # ── Disable startup apps ──────────────────────────────────────
