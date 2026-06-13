@@ -50,7 +50,7 @@ curl -sL https://raw.githubusercontent.com/CuB1z/setup/main/scripts/ubuntu/setup
 Includes:
 - Base development tools
 - FiraCode Nerd Font
-- Brave + extension policy
+- Brave + extension policy + settings policy + profile preferences (vertical tabs, grayscale theme, new-tab look)
 - Docker + Compose
 - VS Code + extensions + settings
 - Postman, Spotify, Obsidian

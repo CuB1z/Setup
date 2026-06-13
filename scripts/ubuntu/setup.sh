@@ -69,6 +69,89 @@ EOF
 warn "Extensions configured via policy — they install automatically when Brave opens."
 ok "Brave extension policy created"
 
+# ── Brave settings (managed policy) ──────────────────────────
+# Enforceable, update-proof settings. NOTE: these lock the matching
+# toggles in brave://settings (shown as "managed by your organization").
+step "Brave settings policy"
+sudo tee "$BRAVE_POLICY_DIR/settings.json" > /dev/null << 'EOF'
+{
+  "BookmarkBarEnabled": true,
+  "ShowHomeButton": false,
+  "RestoreOnStartup": 5,
+  "PasswordManagerEnabled": false,
+  "BraveRewardsDisabled": true,
+  "BraveWalletDisabled": true,
+  "BraveVPNDisabled": true,
+  "BraveAIChatEnabled": false,
+  "BraveNewsDisabled": true,
+  "DefaultSearchProviderEnabled": true,
+  "DefaultSearchProviderName": "Google",
+  "DefaultSearchProviderKeyword": ":g",
+  "DefaultSearchProviderSearchURL": "https://www.google.com/search?q={searchTerms}",
+  "DefaultSearchProviderSuggestURL": "https://www.google.com/complete/search?output=chrome&q={searchTerms}"
+}
+EOF
+ok "Brave settings policy created (Google search, bookmark bar, no Rewards/Wallet/VPN/News/Leo)"
+
+# ── Brave profile preferences (look & feel, not policy-controllable) ──
+# Vertical tabs, grayscale dark theme, new-tab widgets, sidebar. Seeded into
+# the profile; only applied while Brave is closed (else Brave overwrites on exit).
+step "Brave profile preferences"
+if pgrep -x brave >/dev/null 2>&1; then
+  warn "Brave is running — close it and re-run to apply its profile preferences"
+elif ! command -v python3 >/dev/null 2>&1; then
+  warn "python3 not found — skipping Brave profile preferences"
+else
+  BRAVE_PROFILE="$HOME/.config/BraveSoftware/Brave-Browser/Default"
+  mkdir -p "$BRAVE_PROFILE"
+  python3 - "$BRAVE_PROFILE/Preferences" << 'PY' || warn "Could not seed Brave preferences"
+import json, os, sys
+path = sys.argv[1]
+try:
+    prefs = json.load(open(path)) if os.path.exists(path) and os.path.getsize(path) else {}
+except Exception:
+    prefs = {}
+
+def merge(dst, src):
+    for k, v in src.items():
+        if isinstance(v, dict) and isinstance(dst.get(k), dict):
+            merge(dst[k], v)
+        else:
+            dst[k] = v
+
+merge(prefs, {
+    "browser": {"theme": {"color_scheme2": 2, "is_grayscale2": True}},
+    "brave": {
+        "tabs": {
+            "vertical_tabs_enabled": True,
+            "vertical_tabs_collapsed": True,
+            "vertical_tabs_floating_enabled": True,
+            "vertical_tabs_on_right": False,
+        },
+        "new_tab_page": {
+            "show_background_image": True,
+            "show_branded_background_image": False,
+            "show_brave_news": False,
+            "show_clock": True,
+            "clock_format": "h24",
+            "show_rewards": False,
+            "show_stats": False,
+            "show_together": False,
+        },
+        "today": {"opted_in": False},
+        "sidebar": {"sidebar_show_option": 3},
+        "show_side_panel_button": False,
+        "always_show_bookmark_bar_on_ntp": False,
+        "ai_chat": {"show_toolbar_button": False, "autocomplete_provider_enabled": False},
+        "wallet": {"show_wallet_icon_on_toolbar": False},
+        "rewards": {"show_brave_rewards_button_in_location_bar": False},
+    },
+})
+json.dump(prefs, open(path, "w"), separators=(",", ":"))
+PY
+  ok "Brave profile preferences seeded (vertical tabs, grayscale theme, new-tab look, sidebar hidden)"
+fi
+
 # ── Brave bookmarks ───────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/brave_bookmarks.html" ]; then
