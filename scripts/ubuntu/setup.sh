@@ -250,8 +250,10 @@ cat > "$HOME/.config/terminator/config" << 'EOF'
     show_titlebar = False
     use_system_font = False
     font = FiraCode Nerd Font 12
+    background_color = "#282828"
+    foreground_color = "#e8e8e8"
     palette = "#282828:#cc241d:#a9a81d:#d79921:#419a9e:#b16286:#689d6a:#a89984:#928374:#fb4934:#d1ec31:#fabd2f:#8bd5d7:#d3869b:#8ec07c:#ebdbb2"
-    use_theme_colors = True
+    use_theme_colors = False
     bold_is_bright = True
 [layouts]
   [[default]]
@@ -712,13 +714,26 @@ APPS
   gsettings set org.gnome.desktop.wm.keybindings close "['<Super>q']" 2>/dev/null || true
   gsettings set org.gnome.desktop.wm.keybindings toggle-maximized "['<Super>f']" 2>/dev/null || true
 
-  # GNOME Terminal: set FiraCode Nerd Font on the default profile
+  # GNOME Terminal default profile: mirror the Terminator theme (clean + gruvbox)
   if command -v dconf &>/dev/null; then
     PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null | tr -d "'")
     if [ -n "$PROFILE" ]; then
       PROFILE_PATH="/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
+      # FiraCode Nerd Font
       dconf write "${PROFILE_PATH}use-system-font" "false" 2>/dev/null || true
       dconf write "${PROFILE_PATH}font" "'FiraCode Nerd Font 12'" 2>/dev/null || true
+      # Clean gruvbox dark — explicit colours (not theme colours, which pick up an ugly window bg)
+      dconf write "${PROFILE_PATH}use-theme-colors" "false" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}background-color" "'#282828'" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}foreground-color" "'#e8e8e8'" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}bold-is-bright" "true" 2>/dev/null || true
+      # Gruvbox ANSI palette — same 16 colours as the Terminator profile
+      dconf write "${PROFILE_PATH}palette" "['#282828', '#cc241d', '#a9a81d', '#d79921', '#419a9e', '#b16286', '#689d6a', '#a89984', '#928374', '#fb4934', '#d1ec31', '#fabd2f', '#8bd5d7', '#d3869b', '#8ec07c', '#ebdbb2']" 2>/dev/null || true
+      # ibeam cursor with Terminator's cursor colours
+      dconf write "${PROFILE_PATH}cursor-shape" "'ibeam'" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}cursor-colors-set" "true" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}cursor-background-color" "'#aaaaaa'" 2>/dev/null || true
+      dconf write "${PROFILE_PATH}cursor-foreground-color" "'#000000'" 2>/dev/null || true
     fi
   fi
   ok "GNOME tweaks applied (dark mode, dock layout, pinned apps, wallpaper, terminal font)"
