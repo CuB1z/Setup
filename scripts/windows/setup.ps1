@@ -30,6 +30,23 @@ function Merge-Hashtable($dst, $src) {
     }
 }
 
+# True if a registered font's display name matches the pattern. Checks both the
+# machine and per-user font registries, so it works wherever the font was installed.
+function Test-FontInstalled($namePattern) {
+    $keys = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
+        "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+    )
+    foreach ($k in $keys) {
+        if (Test-Path $k) {
+            foreach ($p in (Get-ItemProperty $k).PSObject.Properties) {
+                if ($p.Name -like $namePattern) { return $true }
+            }
+        }
+    }
+    return $false
+}
+
 # ── Windows Update ────────────────────────────────────────────
 Step "Windows Update"
 if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
@@ -300,7 +317,7 @@ if (Test-Path $braveBookmarks) {
 # Needed for the terminal theme (icons + ligatures), matching Ubuntu. No reliable
 # winget package exists, so install from the official Nerd Fonts release.
 Step "Installing FiraCode Nerd Font"
-if (Get-ChildItem "$env:WINDIR\Fonts" -Filter "FiraCodeNerd*.ttf" -ErrorAction SilentlyContinue) {
+if (Test-FontInstalled "*FiraCode*Nerd*") {
     Ok "FiraCode Nerd Font already installed"
 } else {
     $fontZip = Join-Path $env:TEMP "FiraCode.zip"
