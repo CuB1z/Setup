@@ -652,7 +652,7 @@ $desktops = @(
 )
 foreach ($d in $desktops) {
     if (Test-Path $d) {
-        Get-ChildItem -Path $d -Include *.lnk, *.url -File -ErrorAction SilentlyContinue | Remove-Item -Force
+        Get-ChildItem -Path "$d\*" -Include *.lnk, *.url -File -ErrorAction SilentlyContinue | Remove-Item -Force
     }
 }
 
