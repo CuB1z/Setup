@@ -229,7 +229,7 @@ ok "Obsidian installed"
 
 # ── DBeaver Community ─────────────────────────────────────────
 step "DBeaver"
-snap list dbeaver-ce &>/dev/null || sudo snap install dbeaver-ce
+snap list dbeaver-ce &>/dev/null || sudo snap install dbeaver-ce --classic
 ok "DBeaver installed"
 
 # ── Terminator ────────────────────────────────────────────────
