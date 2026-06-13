@@ -295,6 +295,35 @@ if (Test-Path $braveBookmarks) {
     Warn "brave_bookmarks.html found - import it manually via brave://bookmarks -> Import"
 }
 
+# ── FiraCode Nerd Font ────────────────────────────────────────
+# Needed for the terminal theme (icons + ligatures), matching Ubuntu. No reliable
+# winget package exists, so install from the official Nerd Fonts release.
+Step "Installing FiraCode Nerd Font"
+if (Get-ChildItem "$env:WINDIR\Fonts" -Filter "FiraCodeNerd*.ttf" -ErrorAction SilentlyContinue) {
+    Ok "FiraCode Nerd Font already installed"
+} else {
+    $fontZip = Join-Path $env:TEMP "FiraCode.zip"
+    $fontTmp = Join-Path $env:TEMP "FiraCodeNF"
+    try {
+        Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.zip" `
+            -OutFile $fontZip -UseBasicParsing
+        if (Test-Path $fontTmp) { Remove-Item $fontTmp -Recurse -Force }
+        Expand-Archive -Path $fontZip -DestinationPath $fontTmp -Force
+        $shellFonts = (New-Object -ComObject Shell.Application).Namespace(0x14)
+        foreach ($ttf in Get-ChildItem $fontTmp -Filter *.ttf) {
+            if (-not (Test-Path (Join-Path "$env:WINDIR\Fonts" $ttf.Name))) {
+                $shellFonts.CopyHere($ttf.FullName, 0x10)  # 0x10 = yes to all, no UI
+            }
+        }
+        Ok "FiraCode Nerd Font installed"
+    } catch {
+        Warn "Could not install FiraCode Nerd Font - terminal will use a fallback font"
+    } finally {
+        Remove-Item $fontZip -ErrorAction SilentlyContinue
+        Remove-Item $fontTmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # ── Windows Terminal (Ubuntu-like theme, no tabs, maximized) ──
 # Focus mode (no tabs/title bar) + maximized window, gruvbox palette mirroring
 # the Ubuntu/Terminator profile. Merged into settings.json so nothing else is lost.
