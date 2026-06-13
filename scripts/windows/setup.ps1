@@ -147,9 +147,9 @@ $braveExtensionsKey = Join-Path $bravePolicyDir "ExtensionInstallForcelist"
 New-Item -Path $braveExtensionsKey -Force | Out-Null
 
 $braveExtensions = @(
-    "nngceckbapebfimnlniiiahkandclblb;https://clients2.google.com/service/update2/crx",
-    "lpcaedmchfhocbbapmcbpinfpgnhiddi;https://clients2.google.com/service/update2/crx",
-    "eimadpbcbfnmbkopoojfekhnkhdbieeh;https://clients2.google.com/service/update2/crx"
+    "nngceckbapebfimnlniiiahkandclblb;https://clients2.google.com/service/update2/crx",  # Bitwarden
+    "bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc;https://clients2.google.com/service/update2/crx",  # Material Icons for GitHub
+    "ckkdlimhmcjmikdlpkmbgfkaikojcbjk;https://clients2.google.com/service/update2/crx"   # Markdown Viewer
 )
 
 for ($index = 0; $index -lt $braveExtensions.Count; $index++) {
@@ -158,6 +158,117 @@ for ($index = 0; $index -lt $braveExtensions.Count; $index++) {
 
 Warn "Extensions configured via policy - they install automatically when Brave opens."
 Ok "Brave extension policy created"
+
+# ── Brave settings (managed policy) ──────────────────────────
+# Enforceable, update-proof settings. NOTE: these lock the matching
+# toggles in brave://settings (shown as "managed by your organization").
+Step "Brave settings policy"
+New-Item -Path $bravePolicyDir -Force | Out-Null
+
+$braveDwordSettings = @{
+    "BookmarkBarEnabled"           = 1
+    "ShowHomeButton"               = 0
+    "RestoreOnStartup"             = 5
+    "PasswordManagerEnabled"       = 0
+    "BraveRewardsDisabled"         = 1
+    "BraveWalletDisabled"          = 1
+    "BraveVPNDisabled"             = 1
+    "BraveAIChatEnabled"           = 0
+    "BraveNewsDisabled"            = 1
+    "DefaultSearchProviderEnabled" = 1
+}
+foreach ($name in $braveDwordSettings.Keys) {
+    New-ItemProperty -Path $bravePolicyDir -Name $name -Value $braveDwordSettings[$name] -PropertyType DWord -Force | Out-Null
+}
+
+$braveStringSettings = @{
+    "DefaultSearchProviderName"      = "Google"
+    "DefaultSearchProviderKeyword"   = ":g"
+    "DefaultSearchProviderSearchURL"  = "https://www.google.com/search?q={searchTerms}"
+    "DefaultSearchProviderSuggestURL" = "https://www.google.com/complete/search?output=chrome&q={searchTerms}"
+}
+foreach ($name in $braveStringSettings.Keys) {
+    New-ItemProperty -Path $bravePolicyDir -Name $name -Value $braveStringSettings[$name] -PropertyType String -Force | Out-Null
+}
+Ok "Brave settings policy created (Google search, bookmark bar, no Rewards/Wallet/VPN/News/Leo)"
+
+# ── Brave profile preferences (look & feel, not policy-controllable) ──
+# Vertical tabs, grayscale dark theme, new-tab widgets, sidebar. Seeded into
+# the profile; only applied while Brave is closed (else Brave overwrites on exit).
+Step "Brave profile preferences"
+if (Get-Process -Name brave -ErrorAction SilentlyContinue) {
+    Warn "Brave is running - close it and re-run to apply its profile preferences"
+} else {
+    function ConvertTo-HashtableDeep($obj) {
+        if ($obj -is [System.Collections.IDictionary]) {
+            $h = @{}; foreach ($k in $obj.Keys) { $h[$k] = ConvertTo-HashtableDeep $obj[$k] }; return $h
+        } elseif ($obj -is [PSCustomObject]) {
+            $h = @{}; foreach ($p in $obj.PSObject.Properties) { $h[$p.Name] = ConvertTo-HashtableDeep $p.Value }; return $h
+        } elseif ($obj -is [System.Collections.IEnumerable] -and $obj -isnot [string]) {
+            return @($obj | ForEach-Object { ConvertTo-HashtableDeep $_ })
+        } else { return $obj }
+    }
+    function Merge-Hashtable($dst, $src) {
+        foreach ($k in $src.Keys) {
+            if (($src[$k] -is [hashtable]) -and ($dst[$k] -is [hashtable])) {
+                Merge-Hashtable $dst[$k] $src[$k]
+            } else { $dst[$k] = $src[$k] }
+        }
+    }
+
+    $braveProfile = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default"
+    $prefsPath = Join-Path $braveProfile "Preferences"
+    New-Item -Path $braveProfile -ItemType Directory -Force | Out-Null
+
+    $prefs = @{}
+    if (Test-Path $prefsPath) {
+        try { $prefs = ConvertTo-HashtableDeep (Get-Content $prefsPath -Raw | ConvertFrom-Json) } catch { $prefs = @{} }
+    }
+
+    $desired = @{
+        browser = @{ theme = @{ color_scheme2 = 2; is_grayscale2 = $true } }
+        brave = @{
+            tabs = @{
+                vertical_tabs_enabled          = $true
+                vertical_tabs_collapsed        = $true
+                vertical_tabs_floating_enabled = $true
+                vertical_tabs_on_right         = $false
+            }
+            new_tab_page = @{
+                show_background_image         = $true
+                show_branded_background_image = $false
+                show_brave_news               = $false
+                show_clock                    = $true
+                clock_format                  = "h24"
+                show_rewards                  = $false
+                show_stats                    = $false
+                show_together                 = $false
+            }
+            today                          = @{ opted_in = $false }
+            sidebar                        = @{ sidebar_show_option = 3 }
+            show_side_panel_button         = $false
+            always_show_bookmark_bar_on_ntp = $false
+            ai_chat                        = @{ show_toolbar_button = $false; autocomplete_provider_enabled = $false }
+            wallet                         = @{ show_wallet_icon_on_toolbar = $false }
+            rewards                        = @{ show_brave_rewards_button_in_location_bar = $false }
+        }
+    }
+
+    Merge-Hashtable $prefs $desired
+    try {
+        $prefs | ConvertTo-Json -Depth 50 -Compress | Set-Content -Path $prefsPath -Encoding UTF8 -NoNewline
+        Ok "Brave profile preferences seeded (vertical tabs, grayscale theme, new-tab look, sidebar hidden)"
+    } catch {
+        Warn "Could not seed Brave preferences"
+    }
+}
+
+# ── Brave bookmarks ───────────────────────────────────────────
+$braveBookmarks = Join-Path $script_dir "brave_bookmarks.html"
+if (Test-Path $braveBookmarks) {
+    Step "Brave bookmarks"
+    Warn "brave_bookmarks.html found - import it manually via brave://bookmarks -> Import"
+}
 
 # ── Disable startup apps ──────────────────────────────────────
 Step "Disabling startup apps"
