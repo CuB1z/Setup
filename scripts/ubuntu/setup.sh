@@ -19,7 +19,7 @@ sudo apt update && sudo apt upgrade -y
 step "Installing base tools"
 sudo apt install -y \
   git curl wget build-essential unzip ca-certificates gnupg lsb-release \
-  stow xclip xsel wl-clipboard fontconfig fzf ripgrep bat eza apt-transport-https
+  stow xclip xsel wl-clipboard fontconfig fzf ripgrep bat eza apt-transport-https lazygit
 
 # bat may be called batcat on Ubuntu
 if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
@@ -181,6 +181,14 @@ https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
 sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo usermod -aG docker "$USER"
 ok "Docker installed (logout required to use without sudo)"
+
+# ── lazydocker (not in apt — install via official script) ─────
+step "lazydocker"
+mkdir -p "$HOME/.local/bin"
+DIR="$HOME/.local/bin" curl -fsSL \
+  https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash \
+  && ok "lazydocker installed" \
+  || warn "Could not install lazydocker — rerun later"
 
 # ── Visual Studio Code ────────────────────────────────────────
 step "Visual Studio Code"
@@ -573,6 +581,7 @@ alias gco="git checkout"
 alias gcb="git checkout -b"
 alias gl="git log --oneline --graph --decorate"
 alias gd="git diff"
+alias lg="lazygit"
 
 # ── Aliases: docker ────────────────────────────────────────
 alias dc="docker compose"
@@ -580,6 +589,7 @@ alias dcu="docker compose up -d"
 alias dcd="docker compose down"
 alias dps="docker ps"
 alias dlogs="docker compose logs -f"
+alias lzd="lazydocker"
 
 # ── Aliases: navigation ────────────────────────────────────
 alias ll="eza -la --icons --git"
